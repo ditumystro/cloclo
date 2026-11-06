@@ -41,8 +41,12 @@ Définis `OWNER_EMAIL` pour rendre l'app privée :
 4. S'il redemande avec le même e-mail, tu ne reçois rien : son lien lui est renvoyé.
 
 Pour retirer un accès, ajoute son e-mail à `REVOKED_ACCESS`.
-Envoi des e-mails : `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD`
-(mot de passe d'application : https://myaccount.google.com/apppasswords), ou `RESEND_API_KEY`.
+Envoi des e-mails :
+- **En production sur Render (offre gratuite)** : `BREVO_API_KEY` (https://www.brevo.com, gratuit,
+  300 e-mails/jour). Render bloque les ports e-mail (SMTP) de son offre gratuite depuis septembre 2025,
+  donc Gmail ne peut pas partir de là-bas.
+- **En local** : `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD`
+  (mot de passe d'application : https://myaccount.google.com/apppasswords).
 
 ## Tests
 

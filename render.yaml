@@ -20,6 +20,9 @@ services:
         generateValue: true
       - key: PUBLIC_URL
         sync: false
+      # E-mails en production : Brevo (l'offre gratuite de Render bloque Gmail/SMTP)
+      - key: BREVO_API_KEY
+        sync: false
       - key: GMAIL_ADDRESS
         sync: false
       - key: GMAIL_APP_PASSWORD

@@ -39,7 +39,14 @@ PUBLIC_URL = os.environ.get("PUBLIC_URL", "").rstrip("/")
 # Identifiants d'accès révoqués, séparés par des virgules (visibles dans l'e-mail).
 REVOKED = {x.strip() for x in os.environ.get("REVOKED_ACCESS", "").split(",") if x.strip()}
 
-# Envoi des e-mails : Resend (API HTTPS) si configuré, sinon Gmail (SMTP).
+# Envoi des e-mails, par ordre de priorité :
+#  1. Brevo (API HTTPS, gratuit, envoie à n'importe qui) : marche sur l'offre gratuite de Render,
+#     qui bloque les ports e-mail (SMTP) depuis septembre 2025.
+#  2. Resend (API HTTPS) : sans domaine vérifié, n'envoie qu'à ta propre adresse.
+#  3. Gmail (SMTP, port 465) : parfait en local, bloqué sur l'offre gratuite de Render.
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+# Expéditeur Brevo : une adresse validée dans Brevo (par défaut GMAIL_ADDRESS ou OWNER_EMAIL).
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM = os.environ.get("RESEND_FROM", "cloclo <onboarding@resend.dev>")
 GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "")
@@ -163,6 +170,17 @@ def _limit_requests(ip: str) -> None:
 
 
 # ---------------------------------------------------------------- e-mail
+def _send_brevo(to: str, subject: str, text: str, html_body: str) -> None:
+    sender = SENDER_EMAIL or GMAIL_ADDRESS or OWNER_EMAIL
+    req = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=json.dumps({"sender": {"name": "cloclo", "email": sender}, "to": [{"email": to}],
+                         "subject": subject, "textContent": text, "htmlContent": html_body}).encode(),
+        headers={"api-key": BREVO_API_KEY, "Content-Type": "application/json", "Accept": "application/json"},
+    )
+    urllib.request.urlopen(req, timeout=15).read()
+
+
 def _send_resend(to: str, subject: str, text: str, html_body: str) -> None:
     req = urllib.request.Request(
         "https://api.resend.com/emails",
@@ -186,7 +204,9 @@ def _send_gmail(to: str, subject: str, text: str, html_body: str) -> None:
 def send_email(to: str, subject: str, text: str, html_body: str) -> bool:
     """Envoie un e-mail. Renvoie False si aucun envoi n'est configuré ou s'il échoue."""
     try:
-        if RESEND_API_KEY:
+        if BREVO_API_KEY:
+            _send_brevo(to, subject, text, html_body)
+        elif RESEND_API_KEY:
             _send_resend(to, subject, text, html_body)
         elif GMAIL_ADDRESS and GMAIL_APP_PASSWORD:
             _send_gmail(to, subject, text, html_body)

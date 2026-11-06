@@ -332,3 +332,35 @@ def test_store_file_is_written(client, approval):
     import json, pathlib
     data = json.loads(pathlib.Path(access.ACCESS_STORE).read_text())
     assert data["ana@exemple.fr"]["name"] == "Ana"
+
+
+def test_brevo_has_priority_and_builds_request(monkeypatch):
+    captured = {}
+
+    class Resp:
+        def read(self):
+            return b"{}"
+
+    def fake_urlopen(req, timeout):
+        captured["url"], captured["headers"] = req.full_url, dict(req.headers)
+        captured["body"] = __import__("json").loads(req.data)
+        return Resp()
+
+    monkeypatch.setattr(access, "BREVO_API_KEY", "xkeysib-test")
+    monkeypatch.setattr(access, "RESEND_API_KEY", "re_x")
+    monkeypatch.setattr(access, "GMAIL_ADDRESS", "moi@gmail.com")
+    monkeypatch.setattr(access, "SENDER_EMAIL", "")
+    monkeypatch.setattr(access.urllib.request, "urlopen", fake_urlopen)
+    assert access.send_email("ana@exemple.fr", "Sujet", "texte", "<p>html</p>") is True
+    assert captured["url"] == "https://api.brevo.com/v3/smtp/email"
+    assert captured["headers"]["Api-key"] == "xkeysib-test"
+    body = captured["body"]
+    assert body["sender"] == {"name": "cloclo", "email": "moi@gmail.com"}
+    assert body["to"] == [{"email": "ana@exemple.fr"}]
+    assert body["subject"] == "Sujet" and body["htmlContent"] == "<p>html</p>"
+
+
+def test_brevo_failure_is_caught(monkeypatch):
+    monkeypatch.setattr(access, "BREVO_API_KEY", "xkeysib-test")
+    monkeypatch.setattr(access, "_send_brevo", lambda *a: (_ for _ in ()).throw(OSError("401")))
+    assert access.send_email("a@b.c", "s", "t", "h") is False
