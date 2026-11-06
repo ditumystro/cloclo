@@ -30,6 +30,20 @@ Limites : 10 fichiers par message, `MAX_UPLOAD_MB` (20 Mo) au total par conversa
 Les fichiers restent dans la conversation : Claude s'en souvient aux messages suivants.
 Ils sont renvoyés à chaque message, avec mise en cache pour ne pas les repayer plein tarif.
 
+## Accès sur approbation
+
+Définis `OWNER_EMAIL` pour rendre l'app privée :
+
+1. Un nouveau visiteur donne son nom et son e-mail (une seule fois).
+2. Tu reçois une alerte avec un lien : **Approuver** ou **Refuser**.
+3. Une fois approuvé, sa page se débloque toute seule, et il reçoit par e-mail
+   un **lien d'accès personnel et permanent**, qui débloque cloclo sur tous ses appareils.
+4. S'il redemande avec le même e-mail, tu ne reçois rien : son lien lui est renvoyé.
+
+Pour retirer un accès, ajoute son e-mail à `REVOKED_ACCESS`.
+Envoi des e-mails : `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD`
+(mot de passe d'application : https://myaccount.google.com/apppasswords), ou `RESEND_API_KEY`.
+
 ## Tests
 
 ```bash
@@ -39,6 +53,7 @@ pytest
 
 - `tests/test_unit.py` : mot de passe, limite de débit, clé API, schémas.
 - `tests/test_attachments.py` : fichiers joints (PDF, images, Word, texte), limites, erreurs.
+- `tests/test_access.py` : demande d'accès, alerte, approbation, lien personnel, révocation.
 - `tests/test_integration.py` : requêtes HTTP vers l'app, avec le vrai SDK
   Anthropic branché sur un faux serveur Anthropic (aucune clé, aucun coût).
 - `tests/test_live.py` : un vrai appel à l'API, ignoré par défaut. Pour le lancer :

@@ -353,6 +353,7 @@
   // ------------------------------------------------ accès sur approbation
   const accessEl = $("access"), accForm = $("accessForm"), accStatus = $("accStatus");
   let pollTimer = null;
+  let linkError = "";
 
   function accessMsg(text, isErr) {
     accStatus.textContent = text;
@@ -366,7 +367,7 @@
     updateBtn();
     const pendingReq = store.get("pc-request");
     if (pendingReq) { accForm.classList.add("hidden"); waitForApproval(pendingReq); }
-    else { accForm.classList.remove("hidden"); accessMsg(""); }
+    else { accForm.classList.remove("hidden"); accessMsg(linkError, !!linkError); }
   }
 
   function unlockAccess(token) {
@@ -408,18 +409,25 @@
   accForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = $("accName").value.trim();
-    if (!name) return;
+    const email = $("accEmail").value.trim();
+    if (!name || !email) return;
     $("accBtn").disabled = true;
     accessMsg("Envoi…");
     try {
       const r = await fetch("/api/access/request", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, message: $("accMsg").value.trim() }),
+        body: JSON.stringify({ name, email, message: $("accMsg").value.trim() }),
       });
       const data = await r.json().catch(() => ({}));
+      if (r.status === 422 && Array.isArray(data.detail) && data.detail.some((d) => d.loc?.includes("email")))
+        throw new Error("Cette adresse e-mail n’a pas l’air valide.");
       if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "La demande n’a pas pu être envoyée.");
-      store.set("pc-request", data.request_token);
       accForm.classList.add("hidden");
+      if (data.status === "already_approved") {
+        accessMsg(`Tu as déjà accès ✓ On vient de te renvoyer ton lien personnel à ${email}. Ouvre-le pour débloquer cet appareil.`);
+        return;
+      }
+      store.set("pc-request", data.request_token);
       waitForApproval(data.request_token);
     } catch (err) {
       $("accBtn").disabled = false;
@@ -427,7 +435,22 @@
     }
   });
 
-  fetch("/api/config").then((r) => r.json()).then((cfg) => {
+  // Lien d'accès personnel reçu par e-mail : /?acces=<jeton>. On le vérifie, on le
+  // garde dans ce navigateur, puis on l'enlève de la barre d'adresse.
+  async function adoptAccessLink() {
+    const url = new URL(location.href);
+    const token = url.searchParams.get("acces");
+    if (!token) return;
+    url.searchParams.delete("acces");
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+    try {
+      const r = await fetch("/api/access/check", { headers: { "X-Access-Token": token } });
+      if (r.ok) { store.set("pc-access", token); store.del("pc-request"); }
+      else linkError = "Ce lien d’accès n’est pas valable ou a été retiré. Refais une demande.";
+    } catch { /* hors ligne : on réessaiera au prochain chargement */ }
+  }
+
+  adoptAccessLink().then(() => fetch("/api/config")).then((r) => r.json()).then((cfg) => {
     if (cfg.approval_required && !store.get("pc-access")) showAccess();
     else if (cfg.password_required && !store.get("pc-pwd")) showGate();
   }).catch(() => {});

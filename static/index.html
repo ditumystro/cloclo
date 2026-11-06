@@ -259,10 +259,12 @@ details p { margin: 0 0 0.55rem; font-size: 0.875rem; color: var(--muted); }
 
   <section id="access" class="gate access hidden" aria-labelledby="accessTitle">
     <h2 id="accessTitle">Demander l’accès</h2>
-    <p>cloclo est privé. Envoie une demande : le propriétaire reçoit une alerte et t’ouvre l’accès.</p>
+    <p>cloclo est privé. Fais ta demande une seule fois : une fois approuvé, tu reçois par e-mail ton lien d’accès personnel, valable sur tous tes appareils.</p>
     <form id="accessForm">
       <label class="hidden" for="accName">Ton nom</label>
       <input id="accName" maxlength="80" required placeholder="Ton nom" autocomplete="name">
+      <label class="hidden" for="accEmail">Ton e-mail</label>
+      <input id="accEmail" type="email" maxlength="254" required placeholder="Ton e-mail" autocomplete="email">
       <label class="hidden" for="accMsg">Message</label>
       <textarea id="accMsg" maxlength="500" placeholder="Un mot pour te présenter (facultatif)"></textarea>
       <button class="send" id="accBtn" type="submit">Envoyer la demande</button>
@@ -301,6 +303,6 @@ details p { margin: 0 0 0.55rem; font-size: 0.875rem; color: var(--muted); }
     <p class="hint">Entrée pour envoyer, Maj + Entrée pour aller à la ligne. Glisse des fichiers ici ou clique sur « Joindre un fichier ».</p>
   </div>
 </div>
-<script src="/app.js?v=5"></script>
+<script src="/app.js?v=6"></script>
 </body>
 </html>
