@@ -2,36 +2,36 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="theme-color" content="#05070F">
+<meta name="theme-color" content="#F5F7FC">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>cloclo</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' x2='1'><stop offset='0' stop-color='%233EE6FF'/><stop offset='1' stop-color='%238B5CFF'/></linearGradient></defs><rect width='100' height='100' rx='24' fill='%2305070F'/><circle cx='50' cy='50' r='26' fill='none' stroke='url(%23g)' stroke-width='10'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' x2='1'><stop offset='0' stop-color='%230891B2'/><stop offset='1' stop-color='%237C3AED'/></linearGradient></defs><rect width='100' height='100' rx='24' fill='%23FFFFFF'/><circle cx='50' cy='50' r='26' fill='none' stroke='url(%23g)' stroke-width='10'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #05070F;
-  --bg-2: #0A0F1F;
-  --surface: rgba(17, 24, 44, 0.62);
-  --surface-solid: #11182C;
-  --ink: #E8ECFF;
-  --muted: #8B95B8;
-  --line: rgba(120, 140, 255, 0.18);
-  --line-strong: rgba(120, 160, 255, 0.38);
-  --cyan: #3EE6FF;
-  --violet: #8B5CFF;
-  --pink: #FF4FD8;
+  --bg: #F5F7FC;
+  --bg-2: #FFFFFF;
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-solid: #FFFFFF;
+  --ink: #0B1020;
+  --muted: #5B6480;
+  --line: rgba(30, 50, 120, 0.12);
+  --line-strong: rgba(40, 70, 170, 0.24);
+  --cyan: #0891B2;
+  --violet: #7C3AED;
+  --pink: #DB2777;
   --accent: var(--cyan);
-  --accent-ink: #031018;
-  --you: rgba(62, 230, 255, 0.10);
-  --code: rgba(5, 9, 22, 0.75);
-  --danger: #FF6B8B;
-  --glow: 0 0 0 1px rgba(62, 230, 255, 0.35), 0 0 24px rgba(62, 230, 255, 0.25);
-  --grad: linear-gradient(120deg, var(--cyan), var(--violet) 55%, var(--pink));
+  --accent-ink: #FFFFFF;
+  --you: rgba(8, 145, 178, 0.08);
+  --code: #F1F4FB;
+  --danger: #D92D50;
+  --glow: 0 0 0 1px rgba(6, 182, 212, 0.45), 0 0 22px rgba(6, 182, 212, 0.22);
+  --grad: linear-gradient(120deg, #0891B2, #7C3AED 55%, #DB2777);
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --display: "Unbounded", "Space Grotesk", system-ui, sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -40,8 +40,8 @@
 html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
 body {
   margin: 0; min-height: 100%;
-  background: radial-gradient(1200px 600px at 85% -10%, rgba(139, 92, 255, 0.22), transparent 60%),
-              radial-gradient(900px 500px at -10% 110%, rgba(62, 230, 255, 0.16), transparent 60%),
+  background: radial-gradient(1200px 600px at 85% -10%, rgba(124, 58, 237, 0.10), transparent 60%),
+              radial-gradient(900px 500px at -10% 110%, rgba(6, 182, 212, 0.10), transparent 60%),
               var(--bg);
   background-attachment: fixed;
   color: var(--ink);
@@ -51,13 +51,13 @@ body {
 body::before {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: -1;
   background-image:
-    linear-gradient(rgba(120, 160, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(120, 160, 255, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(40, 70, 170, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(40, 70, 170, 0.07) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: radial-gradient(ellipse at 50% 0%, #000 0%, transparent 75%);
   -webkit-mask-image: radial-gradient(ellipse at 50% 0%, #000 0%, transparent 75%);
 }
-::selection { background: rgba(62, 230, 255, 0.35); color: #fff; }
+::selection { background: rgba(6, 182, 212, 0.25); color: var(--ink); }
 
 .wrap { max-width: 46rem; margin: 0 auto; padding: 1.75rem 1rem 2rem; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
@@ -65,7 +65,7 @@ h1 {
   font: 800 clamp(2.2rem, 8vw, 3.4rem)/1 var(--display);
   letter-spacing: -0.02em; margin: 0;
   background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 0 18px rgba(62, 230, 255, 0.25));
+  filter: drop-shadow(0 4px 14px rgba(124, 58, 237, 0.18));
 }
 .sub {
   color: var(--muted); margin: 0.55rem 0 0; font: 500 0.78rem/1.4 var(--mono);
@@ -79,7 +79,7 @@ h1 {
 @keyframes pulse { 50% { opacity: 0.35; box-shadow: 0 0 2px var(--cyan); } }
 
 .ghost {
-  background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line-strong); color: var(--ink);
+  background: #fff; border: 1px solid var(--line-strong); color: var(--ink);
   font: 500 0.78rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase;
   padding: 0.55rem 0.95rem; border-radius: 10px; cursor: pointer; transition: box-shadow .2s, border-color .2s;
 }
@@ -93,6 +93,7 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, summary:focu
   background: var(--surface);
   backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
   border: 1px solid var(--line);
+  box-shadow: 0 6px 24px rgba(20, 40, 110, 0.06);
 }
 
 #thread { display: flex; flex-direction: column; gap: 1.1rem; margin-bottom: 1.25rem; }
@@ -100,7 +101,7 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, summary:focu
 .empty p { margin: 0 0 0.75rem; font: 500 0.78rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.55rem; }
 .chip {
-  background: rgba(62, 230, 255, 0.05); border: 1px solid var(--line-strong); color: var(--ink);
+  background: #fff; border: 1px solid var(--line-strong); color: var(--ink);
   border-radius: 12px; padding: 0.5rem 0.85rem; font: inherit; font-size: 0.9rem; cursor: pointer; text-align: left;
   transition: border-color .2s, box-shadow .2s, transform .2s;
 }
@@ -109,14 +110,14 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, summary:focu
 .msg { max-width: 100%; animation: rise .35s ease-out both; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 .msg.you {
-  align-self: flex-end; background: var(--you); border: 1px solid rgba(62, 230, 255, 0.35);
+  align-self: flex-end; background: var(--you); border: 1px solid rgba(8, 145, 178, 0.30);
   border-radius: 18px 18px 4px 18px; padding: 0.75rem 1rem; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 88%;
-  box-shadow: 0 0 22px rgba(62, 230, 255, 0.08);
+  box-shadow: 0 4px 18px rgba(8, 145, 178, 0.06);
 }
 .msg.claude { position: relative; border-radius: 4px 18px 18px 18px; padding: 0.95rem 1.1rem 0.95rem 1.25rem; }
 .msg.claude::before {
   content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 2px; border-radius: 2px;
-  background: var(--grad); box-shadow: 0 0 10px rgba(139, 92, 255, 0.6);
+  background: var(--grad); box-shadow: 0 0 8px rgba(124, 58, 237, 0.35);
 }
 .msg.claude .body { overflow-wrap: anywhere; }
 .msg.claude .body > :first-child { margin-top: 0; }
@@ -127,14 +128,14 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, summary:focu
   overflow-x: auto; margin: 0 0 0.75rem; font-size: 0.86rem; line-height: 1.5;
 }
 .msg.claude code { font-family: var(--mono); font-size: 0.88em; }
-.msg.claude :not(pre) > code { background: rgba(139, 92, 255, 0.16); color: #D9CCFF; padding: 0.1em 0.4em; border-radius: 6px; }
-.msg.claude strong { color: #fff; }
+.msg.claude :not(pre) > code { background: rgba(124, 58, 237, 0.09); color: #5B21B6; padding: 0.1em 0.4em; border-radius: 6px; }
+.msg.claude strong { color: var(--ink); }
 .msg.claude ul, .msg.claude ol { margin: 0 0 0.75rem; padding-left: 1.3rem; }
 .msg.claude li::marker { color: var(--cyan); }
-.msg.claude h3 { font: 600 1rem/1.3 var(--display); margin: 1rem 0 0.45rem; color: #fff; }
+.msg.claude h3 { font: 600 1rem/1.3 var(--display); margin: 1rem 0 0.45rem; color: var(--ink); }
 .thinking {
   font: 500 0.82rem var(--mono); letter-spacing: 0.08em;
-  background: linear-gradient(90deg, var(--muted) 0%, #fff 50%, var(--muted) 100%) 0 0 / 200% 100%;
+  background: linear-gradient(90deg, var(--muted) 0%, var(--violet) 50%, var(--muted) 100%) 0 0 / 200% 100%;
   -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 1.6s linear infinite;
 }
 @keyframes shimmer { to { background-position: -200% 0; } }
@@ -160,42 +161,42 @@ textarea {
   width: 100%; border: none; resize: none; background: transparent; color: var(--ink);
   font: inherit; padding: 0.4rem 0.5rem; min-height: 3.2rem; max-height: 40vh; outline: none;
 }
-textarea::placeholder, input::placeholder { color: #66709A; }
+textarea::placeholder, input::placeholder { color: #8A93AE; }
 textarea:focus-visible { outline: none; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 select {
-  background: rgba(255, 255, 255, 0.04); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 10px;
+  background: #fff; color: var(--ink); border: 1px solid var(--line-strong); border-radius: 10px;
   font: 500 0.78rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 0.5rem 0.65rem;
 }
 select option { background: var(--surface-solid); color: var(--ink); }
 .send {
   background: var(--grad); color: #fff; border: none; border-radius: 12px;
   font: 700 0.82rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
-  padding: 0.7rem 1.25rem; cursor: pointer; box-shadow: 0 0 22px rgba(139, 92, 255, 0.35);
+  padding: 0.7rem 1.25rem; cursor: pointer; box-shadow: 0 6px 20px rgba(124, 58, 237, 0.28);
   transition: transform .15s, box-shadow .2s, opacity .2s;
 }
-.send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 30px rgba(62, 230, 255, 0.45); }
+.send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(8, 145, 178, 0.35); }
 .send:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
-.send.stop { background: transparent; color: var(--danger); border: 1px solid var(--danger); box-shadow: 0 0 16px rgba(255, 107, 139, 0.3); }
+.send.stop { background: #fff; color: var(--danger); border: 1px solid var(--danger); box-shadow: none; }
 .hint { font: 0.7rem/1.5 var(--mono); color: var(--muted); margin: 0.55rem 0.35rem 0; letter-spacing: 0.03em; }
 
 details { margin-bottom: 1.1rem; border-radius: 16px; padding: 0.15rem 1rem; }
 summary { cursor: pointer; padding: 0.7rem 0; font: 500 0.78rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 summary:hover { color: var(--ink); }
-details textarea { border: 1px solid var(--line); background: rgba(0, 0, 0, 0.25); border-radius: 12px; margin-bottom: 0.85rem; min-height: 4.5rem; padding: 0.6rem 0.75rem; }
+details textarea { border: 1px solid var(--line); background: #fff; border-radius: 12px; margin-bottom: 0.85rem; min-height: 4.5rem; padding: 0.6rem 0.75rem; }
 details p { margin: 0 0 0.55rem; font-size: 0.875rem; color: var(--muted); }
 
 .unavailable { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 1rem 1.1rem; }
 .hidden { display: none !important; }
 
-.gate { border-radius: 18px; padding: 1.15rem 1.2rem; margin-bottom: 1.1rem; border-color: rgba(139, 92, 255, 0.45); box-shadow: 0 0 40px rgba(139, 92, 255, 0.12); }
+.gate { border-radius: 18px; padding: 1.15rem 1.2rem; margin-bottom: 1.1rem; border-color: rgba(124, 58, 237, 0.35); box-shadow: 0 10px 40px rgba(124, 58, 237, 0.10); }
 .gate p { margin: 0 0 0.7rem; }
-.gate .row input { flex: 1; min-width: 12rem; background: rgba(0, 0, 0, 0.3); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 12px; padding: 0.6rem 0.9rem; font: inherit; }
+.gate .row input { flex: 1; min-width: 12rem; background: #fff; color: var(--ink); border: 1px solid var(--line-strong); border-radius: 12px; padding: 0.6rem 0.9rem; font: inherit; }
 
 .access h2 { font: 700 1.15rem/1.3 var(--display); margin: 0 0 0.45rem; }
 .access p { margin: 0 0 0.9rem; color: var(--muted); font-size: 0.95rem; }
 .access input, .access textarea {
-  width: 100%; background: rgba(0, 0, 0, 0.3); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 12px;
+  width: 100%; background: #fff; color: var(--ink); border: 1px solid var(--line-strong); border-radius: 12px;
   padding: 0.6rem 0.85rem; font: inherit; margin-bottom: 0.65rem; min-height: auto;
 }
 .access textarea { min-height: 4rem; resize: vertical; }
@@ -207,24 +208,24 @@ details p { margin: 0 0 0.55rem; font-size: 0.875rem; color: var(--muted); }
 .files:empty { display: none; padding: 0; }
 .file {
   display: inline-flex; align-items: center; gap: 0.4rem; max-width: 100%;
-  background: rgba(62, 230, 255, 0.07); border: 1px solid rgba(62, 230, 255, 0.35); border-radius: 10px;
+  background: rgba(8, 145, 178, 0.07); border: 1px solid rgba(8, 145, 178, 0.35); border-radius: 10px;
   padding: 0.25rem 0.3rem 0.25rem 0.7rem; font: 0.78rem var(--mono);
 }
 .file .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 14rem; }
 .file .fsize { color: var(--muted); }
 .file button { background: none; border: none; color: var(--muted); cursor: pointer; font: inherit; width: 1.5rem; height: 1.5rem; border-radius: 6px; line-height: 1; }
-.file button:hover { color: var(--danger); background: rgba(255, 107, 139, 0.12); }
+.file button:hover { color: var(--danger); background: rgba(217, 45, 80, 0.10); }
 .msg.you .sent-files { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.45rem; }
-.msg.you .sent-files span { background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line); border-radius: 8px; padding: 0.15rem 0.55rem; font: 0.75rem var(--mono); }
+.msg.you .sent-files span { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 0.15rem 0.55rem; font: 0.75rem var(--mono); }
 .left { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .attach {
   display: inline-flex; align-items: center; gap: 0.45rem;
-  background: rgba(62, 230, 255, 0.08); color: var(--cyan); border: 1px solid rgba(62, 230, 255, 0.55); border-radius: 12px;
+  background: rgba(8, 145, 178, 0.07); color: var(--cyan); border: 1px solid rgba(8, 145, 178, 0.55); border-radius: 12px;
   font: 600 0.78rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 0.55rem 0.9rem; cursor: pointer;
   transition: box-shadow .2s, background .2s;
 }
 .attach svg { width: 1.05rem; height: 1.05rem; flex: none; }
-.attach:hover { background: rgba(62, 230, 255, 0.16); box-shadow: var(--glow); }
+.attach:hover { background: rgba(8, 145, 178, 0.14); box-shadow: var(--glow); }
 .box.dragging { border-color: var(--cyan); border-style: dashed; box-shadow: var(--glow); }
 .file-err { color: var(--danger); font-size: 0.82rem; margin: 0 0.3rem 0.45rem; }
 
@@ -303,6 +304,6 @@ details p { margin: 0 0 0.55rem; font-size: 0.875rem; color: var(--muted); }
     <p class="hint">Entrée pour envoyer, Maj + Entrée pour aller à la ligne. Glisse des fichiers ici ou clique sur « Joindre un fichier ».</p>
   </div>
 </div>
-<script src="/app.js?v=6"></script>
+<script src="/app.js?v=7"></script>
 </body>
 </html>

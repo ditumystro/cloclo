@@ -311,16 +311,16 @@ def _page(title: str, body: str) -> HTMLResponse:
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700&family=Space+Grotesk:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"><title>{html.escape(title)} · cloclo</title>
-<style>body{{font:16px/1.6 "Space Grotesk",system-ui,sans-serif;color:#E8ECFF;margin:0;padding:3rem 1rem;min-height:100vh;
-background:radial-gradient(900px 500px at 85% -10%,rgba(139,92,255,.25),transparent 60%),#05070F}}
-.card{{max-width:28rem;margin:0 auto;background:rgba(17,24,44,.7);border:1px solid rgba(139,92,255,.45);border-radius:18px;
-padding:1.6rem;box-shadow:0 0 40px rgba(139,92,255,.15)}}
+<style>body{{font:16px/1.6 "Space Grotesk",system-ui,sans-serif;color:#0B1020;margin:0;padding:3rem 1rem;min-height:100vh;
+background:radial-gradient(900px 500px at 85% -10%,rgba(124,58,237,.10),transparent 60%),#F5F7FC}}
+.card{{max-width:28rem;margin:0 auto;background:#fff;border:1px solid rgba(124,58,237,.3);border-radius:18px;
+padding:1.6rem;box-shadow:0 10px 40px rgba(124,58,237,.10)}}
 h1{{font:700 1.3rem/1.3 Unbounded,system-ui,sans-serif;margin:0 0 .8rem}}
 button{{font:700 .8rem "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase;border:none;border-radius:12px;
 padding:.75rem 1.2rem;cursor:pointer;margin:.3rem .5rem 0 0}}
-.ok{{background:linear-gradient(120deg,#3EE6FF,#8B5CFF 55%,#FF4FD8);color:#fff;box-shadow:0 0 22px rgba(139,92,255,.4)}}
-.no{{background:transparent;color:#FF6B8B;border:1px solid #FF6B8B}}
-.muted{{color:#8B95B8;font:.85rem "JetBrains Mono",monospace}}code{{color:#3EE6FF}}</style></head><body><div class="card">{body}</div></body></html>""")
+.ok{{background:linear-gradient(120deg,#0891B2,#7C3AED 55%,#DB2777);color:#fff;box-shadow:0 6px 20px rgba(124,58,237,.28)}}
+.no{{background:#fff;color:#D92D50;border:1px solid #D92D50}}
+.muted{{color:#5B6480;font:.85rem "JetBrains Mono",monospace}}code{{color:#0891B2}}</style></head><body><div class="card">{body}</div></body></html>""")
 
 
 @router.get("/api/access/decide", response_class=HTMLResponse)
