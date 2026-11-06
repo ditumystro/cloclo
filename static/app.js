@@ -186,6 +186,8 @@
       const headers = { "Content-Type": "application/json" };
       const pwd = store.get("pc-pwd");
       if (pwd) headers["X-App-Password"] = pwd;
+      const grant = store.get("pc-access");
+      if (grant) headers["X-Access-Token"] = grant;
 
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -201,6 +203,7 @@
           : res.status === 413 ? "Fichiers trop lourds."
           : "La demande a été refusée par le serveur.";
         if (res.status === 401) { store.del("pc-pwd"); showGate(detail); }
+        if (res.status === 403) { store.del("pc-access"); showAccess(); }
         throw new Error(detail);
       }
 
@@ -347,7 +350,85 @@
   renderEmpty();
   updateBtn();
 
+  // ------------------------------------------------ accès sur approbation
+  const accessEl = $("access"), accForm = $("accessForm"), accStatus = $("accStatus");
+  let pollTimer = null;
+
+  function accessMsg(text, isErr) {
+    accStatus.textContent = text;
+    accStatus.classList.toggle("err", !!isErr);
+    accStatus.classList.toggle("hidden", !text);
+  }
+
+  function showAccess() {
+    locked = true;
+    accessEl.classList.remove("hidden");
+    updateBtn();
+    const pendingReq = store.get("pc-request");
+    if (pendingReq) { accForm.classList.add("hidden"); waitForApproval(pendingReq); }
+    else { accForm.classList.remove("hidden"); accessMsg(""); }
+  }
+
+  function unlockAccess(token) {
+    clearInterval(pollTimer);
+    store.set("pc-access", token);
+    store.del("pc-request");
+    accessEl.classList.add("hidden");
+    locked = false;
+    updateBtn();
+    promptEl.focus();
+  }
+
+  function resetRequest(msg) {
+    clearInterval(pollTimer);
+    store.del("pc-request");
+    accForm.classList.remove("hidden");
+    $("accBtn").disabled = false;
+    accessMsg(msg, true);
+  }
+
+  async function checkStatus(reqToken) {
+    try {
+      const r = await fetch("/api/access/status", { headers: { "X-Access-Request": reqToken } });
+      if (r.status === 400) return resetRequest("Ta demande a expiré. Envoie-en une nouvelle.");
+      const s = await r.json();
+      if (s.status === "approved") unlockAccess(s.access_token);
+      else if (s.status === "denied") resetRequest("Ta demande a été refusée.");
+      else if (s.status === "unknown") resetRequest("Ta demande a été perdue (serveur redémarré). Envoie-la à nouveau.");
+    } catch { /* réseau coupé : on réessaie au prochain tour */ }
+  }
+
+  function waitForApproval(reqToken) {
+    accessMsg("Demande envoyée ✓ En attente de l’approbation du propriétaire… Cette page se débloquera toute seule.");
+    clearInterval(pollTimer);
+    checkStatus(reqToken);
+    pollTimer = setInterval(() => checkStatus(reqToken), 5000);
+  }
+
+  accForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("accName").value.trim();
+    if (!name) return;
+    $("accBtn").disabled = true;
+    accessMsg("Envoi…");
+    try {
+      const r = await fetch("/api/access/request", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, message: $("accMsg").value.trim() }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "La demande n’a pas pu être envoyée.");
+      store.set("pc-request", data.request_token);
+      accForm.classList.add("hidden");
+      waitForApproval(data.request_token);
+    } catch (err) {
+      $("accBtn").disabled = false;
+      accessMsg(err.message || "Impossible de joindre le serveur.", true);
+    }
+  });
+
   fetch("/api/config").then((r) => r.json()).then((cfg) => {
-    if (cfg.password_required && !store.get("pc-pwd")) showGate();
+    if (cfg.approval_required && !store.get("pc-access")) showAccess();
+    else if (cfg.password_required && !store.get("pc-pwd")) showGate();
   }).catch(() => {});
 })();

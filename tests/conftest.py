@@ -84,6 +84,11 @@ def upstream(monkeypatch) -> FakeAnthropic:
 def clean_state(monkeypatch):
     """Chaque test part d'un état propre : pas de mot de passe, compteurs vides."""
     monkeypatch.setattr(main, "APP_PASSWORD", "")
+    monkeypatch.setattr(main.access, "OWNER_EMAIL", "")
+    monkeypatch.setattr(main.access, "ACCESS_SECRET", "secret-de-test")
+    monkeypatch.setattr(main.access, "REVOKED", set())
+    main.access._requests.clear()
+    main.access._request_hits.clear()
     monkeypatch.setattr(main, "RATE_LIMIT_PER_MIN", 20)
     main._hits.clear()
     yield

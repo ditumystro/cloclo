@@ -14,7 +14,7 @@ def test_health(client):
 
 
 def test_config_without_password(client):
-    assert client.get("/api/config").json() == {"password_required": False,
+    assert client.get("/api/config").json() == {"password_required": False, "approval_required": False,
                                                  "modes": ["rapide", "standard", "approfondi"]}
 
 

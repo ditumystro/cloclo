@@ -23,6 +23,8 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
+import access
+
 # ---------------------------------------------------------------- configuration
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
@@ -223,6 +225,9 @@ def check_password(given: str | None) -> None:
 
 
 # ---------------------------------------------------------------- routes
+app.include_router(access.router)
+
+
 @app.get("/api/health")
 async def health():
     return {"ok": True}
@@ -230,7 +235,8 @@ async def health():
 
 @app.get("/api/config")
 async def config():
-    return {"password_required": bool(APP_PASSWORD), "modes": list(MODELS)}
+    return {"password_required": bool(APP_PASSWORD), "approval_required": access.approval_required(),
+            "modes": list(MODELS)}
 
 
 @app.post("/api/chat")
@@ -238,8 +244,10 @@ async def chat(
     body: ChatRequest,
     request: Request,
     x_app_password: str | None = Header(default=None),
+    x_access_token: str | None = Header(default=None),
 ):
     check_password(x_app_password)
+    access.check_access(x_access_token)
     check_rate_limit(client_ip(request))
 
     if body.messages[0].role != "user" or body.messages[-1].role != "user":

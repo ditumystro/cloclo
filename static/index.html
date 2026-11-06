@@ -140,6 +140,16 @@ details p { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--muted); }
 .file button:hover { color: var(--ink); background: var(--line); }
 .msg.you .sent-files { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.4rem; }
 .msg.you .sent-files span { background: var(--surface); border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 0.8rem; }
+.access h2 { font: 600 1.15rem/1.3 "Bricolage Grotesque", system-ui, sans-serif; margin: 0 0 0.4rem; }
+.access p { margin: 0 0 0.8rem; color: var(--muted); font-size: 0.95rem; }
+.access input, .access textarea {
+  width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 12px;
+  padding: 0.55rem 0.8rem; font: inherit; margin-bottom: 0.6rem; min-height: auto;
+}
+.access textarea { min-height: 4rem; resize: vertical; }
+.access input:focus-visible, .access textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.access .status { margin-top: 0.8rem; color: var(--ink); }
+.access .status.err { color: var(--danger); }
 .left { display: flex; align-items: center; gap: 0.5rem; }
 .attach {
   display: inline-flex; align-items: center; gap: 0.4rem;
@@ -169,6 +179,19 @@ details p { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--muted); }
       <button class="send" id="pwdBtn" type="button">Déverrouiller</button>
     </div>
   </div>
+
+  <section id="access" class="gate access hidden" aria-labelledby="accessTitle">
+    <h2 id="accessTitle">Demander l’accès</h2>
+    <p>cloclo est privé. Envoie une demande : le propriétaire reçoit une alerte et t’ouvre l’accès.</p>
+    <form id="accessForm">
+      <label class="hidden" for="accName">Ton nom</label>
+      <input id="accName" maxlength="80" required placeholder="Ton nom" autocomplete="name">
+      <label class="hidden" for="accMsg">Message</label>
+      <textarea id="accMsg" maxlength="500" placeholder="Un mot pour te présenter (facultatif)"></textarea>
+      <button class="send" id="accBtn" type="submit">Envoyer la demande</button>
+    </form>
+    <p class="status hidden" id="accStatus" role="status"></p>
+  </section>
 
   <details id="rulesBox">
     <summary>Instructions permanentes</summary>
@@ -201,6 +224,6 @@ details p { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--muted); }
     <p class="hint">Entrée pour envoyer, Maj + Entrée pour aller à la ligne. Glisse des fichiers ici ou clique sur « Joindre un fichier ».</p>
   </div>
 </div>
-<script src="/app.js?v=3"></script>
+<script src="/app.js?v=4"></script>
 </body>
 </html>

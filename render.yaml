@@ -13,3 +13,16 @@ services:
         sync: false
       - key: APP_PASSWORD
         sync: false
+      # Accès sur approbation
+      - key: OWNER_EMAIL
+        sync: false
+      - key: ACCESS_SECRET
+        generateValue: true
+      - key: PUBLIC_URL
+        sync: false
+      - key: GMAIL_ADDRESS
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
