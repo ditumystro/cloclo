@@ -1,4 +1,4 @@
-# Prompt → Claude
+# cloclo
 
 Petite app web : un frontend où l'on tape un prompt, et un backend FastAPI qui
 le transmet à l'API Claude avec ta clé et renvoie la réponse en streaming.
@@ -49,7 +49,7 @@ pytest
 1. Pousse ce dossier dans un dépôt GitHub (le `.gitignore` exclut déjà `.env`).
 2. Sur https://render.com : New → Blueprint, choisis le dépôt. Render lit `render.yaml`.
 3. Renseigne `ANTHROPIC_API_KEY` et `APP_PASSWORD` quand Render les demande.
-4. Ton app est en ligne sur `https://prompt-claude-xxxx.onrender.com`.
+4. Ton app est en ligne sur `https://cloclo-xxxx.onrender.com`.
 
 Le plan gratuit met le service en veille après un moment d'inactivité :
 la première requête après une pause peut prendre ~30 s.
@@ -60,8 +60,8 @@ Le `Dockerfile` marche tel quel sur Railway, Fly.io, Google Cloud Run, etc. :
 il suffit de définir les variables d'environnement.
 
 ```bash
-docker build -t prompt-claude .
-docker run -p 8000:8000 -e ANTHROPIC_API_KEY=sk-ant-... -e APP_PASSWORD=... prompt-claude
+docker build -t cloclo .
+docker run -p 8000:8000 -e ANTHROPIC_API_KEY=sk-ant-... -e APP_PASSWORD=... cloclo
 ```
 
 ## Variables d'environnement

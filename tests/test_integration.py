@@ -25,7 +25,7 @@ def test_config_with_password(client, monkeypatch):
 
 def test_frontend_is_served(client):
     r = client.get("/")
-    assert r.status_code == 200 and "Prompt" in r.text and "/app.js" in r.text
+    assert r.status_code == 200 and "<h1>cloclo</h1>" in r.text and "/app.js" in r.text
     assert client.get("/app.js").status_code == 200
 
 

@@ -1,4 +1,4 @@
-"""Prompt → Claude : un petit relais FastAPI vers l'API Claude d'Anthropic.
+"""cloclo : un petit relais FastAPI vers l'API Claude d'Anthropic.
 
 Le navigateur envoie la conversation à /api/chat ; le serveur l'envoie à
 Claude avec la clé API (jamais exposée au navigateur) et renvoie la
@@ -52,8 +52,8 @@ PLACEHOLDER_KEYS = {"", "sk-ant-..."}
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-logger = logging.getLogger("prompt-claude")
-app = FastAPI(title="Prompt → Claude", docs_url=None, redoc_url=None)
+logger = logging.getLogger("cloclo")
+app = FastAPI(title="cloclo", docs_url=None, redoc_url=None)
 _client: anthropic.AsyncAnthropic | None = None
 
 
