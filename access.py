@@ -217,12 +217,18 @@ async def access_status(x_access_request: str | None = Header(default=None)):
 
 def _page(title: str, body: str) -> HTMLResponse:
     return HTMLResponse(f"""<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>{html.escape(title)} · cloclo</title>
-<style>body{{font:16px/1.55 system-ui,sans-serif;background:#EEF1F6;color:#1C2333;margin:0;padding:3rem 1rem}}
-.card{{max-width:28rem;margin:0 auto;background:#fff;border:1px solid #D5DAE4;border-radius:16px;padding:1.5rem}}
-h1{{font-size:1.35rem;margin:0 0 .75rem}}button{{font:600 1rem system-ui;border:none;border-radius:999px;
-padding:.65rem 1.2rem;cursor:pointer;margin-right:.5rem}}.ok{{background:#2F4BD8;color:#fff}}.no{{background:#E6EAF2;color:#1C2333}}
-.muted{{color:#5F6880;font-size:.9rem}}</style></head><body><div class="card">{body}</div></body></html>""")
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700&family=Space+Grotesk:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"><title>{html.escape(title)} · cloclo</title>
+<style>body{{font:16px/1.6 "Space Grotesk",system-ui,sans-serif;color:#E8ECFF;margin:0;padding:3rem 1rem;min-height:100vh;
+background:radial-gradient(900px 500px at 85% -10%,rgba(139,92,255,.25),transparent 60%),#05070F}}
+.card{{max-width:28rem;margin:0 auto;background:rgba(17,24,44,.7);border:1px solid rgba(139,92,255,.45);border-radius:18px;
+padding:1.6rem;box-shadow:0 0 40px rgba(139,92,255,.15)}}
+h1{{font:700 1.3rem/1.3 Unbounded,system-ui,sans-serif;margin:0 0 .8rem}}
+button{{font:700 .8rem "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase;border:none;border-radius:12px;
+padding:.75rem 1.2rem;cursor:pointer;margin:.3rem .5rem 0 0}}
+.ok{{background:linear-gradient(120deg,#3EE6FF,#8B5CFF 55%,#FF4FD8);color:#fff;box-shadow:0 0 22px rgba(139,92,255,.4)}}
+.no{{background:transparent;color:#FF6B8B;border:1px solid #FF6B8B}}
+.muted{{color:#8B95B8;font:.85rem "JetBrains Mono",monospace}}code{{color:#3EE6FF}}</style></head><body><div class="card">{body}</div></body></html>""")
 
 
 @router.get("/api/access/decide", response_class=HTMLResponse)
