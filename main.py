@@ -5,6 +5,7 @@ Claude avec la clé API (jamais exposée au navigateur) et renvoie la
 réponse en flux NDJSON : une ligne JSON par événement.
 """
 
+import asyncio
 import base64
 import binascii
 import io
@@ -19,11 +20,12 @@ from typing import Literal
 
 import anthropic
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
 import access
+import generators
 
 # ---------------------------------------------------------------- configuration
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -51,6 +53,10 @@ MODELS = {
 # autre modèle. Non disponible pour Claude Haiku 5.5.
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 PLACEHOLDER_KEYS = {"", "sk-ant-..."}
+
+# Nombre max d'allers-retours Claude ↔ outils dans une même réponse
+MAX_TOOL_ROUNDS = 6
+TOOL_STATUS = {"create_pdf": "Création du PDF…", "create_excel": "Création du fichier Excel…"}
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -255,16 +261,21 @@ async def chat(
 
     messages = to_api_messages(body.messages)
     client = get_client()
+    # Consignes fixes d'abord (outils + système), puis celles de l'utilisateur :
+    # le début de la requête reste identique d'un message à l'autre, donc en cache.
+    system = [{"type": "text", "text": generators.SYSTEM_PROMPT}]
+    if body.system and body.system.strip():
+        system.append({"type": "text", "text": "Consignes de l’utilisateur :\n" + body.system.strip()})
     params = {
         "model": MODELS[body.mode],
         "max_tokens": MAX_TOKENS,
+        "system": system,
+        "tools": generators.TOOLS,
         "messages": messages,
         # Les fichiers sont renvoyés à chaque message de la conversation : la mise
         # en cache évite de les repayer plein tarif à chaque fois.
         "cache_control": {"type": "ephemeral"},
     }
-    if body.system and body.system.strip():
-        params["system"] = body.system.strip()
     if "haiku" in params["model"]:
         open_stream = client.messages.stream
     else:
@@ -275,19 +286,63 @@ async def chat(
         return json.dumps(obj, ensure_ascii=False) + "\n"
 
     async def events():
+        wrote = False      # du texte a déjà été envoyé au navigateur
+        files = 0          # fichiers créés pendant cette réponse
+        json_retries = 0
+        final = None
         try:
-            wrote = False
-            async with open_stream(**params) as stream:
-                async for text in stream.text_stream:
-                    wrote = True
-                    yield line({"type": "text", "text": text})
-                final = await stream.get_final_message()
-            if final.stop_reason == "refusal" and not wrote:
+            for _ in range(MAX_TOOL_ROUNDS):
+                try:
+                    separate = wrote  # nouveau tour après un outil : on saute une ligne
+                    async with open_stream(**params) as stream:
+                        async for event in stream:
+                            if event.type == "text" and event.text:
+                                if separate:
+                                    yield line({"type": "text", "text": "\n\n"})
+                                    separate = False
+                                wrote = True
+                                yield line({"type": "text", "text": event.text})
+                            elif event.type == "content_block_start" and event.content_block.type == "tool_use":
+                                yield line({"type": "status", "text": TOOL_STATUS.get(event.content_block.name, "Création du fichier…")})
+                        final = await stream.get_final_message()
+                    json_retries = 0
+                except ValueError:
+                    # JSON d'outil illisible : pas de tool_use_id à qui répondre, on relance le tour.
+                    json_retries += 1
+                    if json_retries > 2:
+                        raise
+                    continue
+
+                tool_uses = [b for b in final.content if b.type == "tool_use"]
+                if final.stop_reason == "refusal" or not tool_uses:
+                    break
+                if final.stop_reason == "max_tokens":
+                    yield line({"type": "error", "message": "Le document demandé est trop long pour être créé en une fois. Demande-le en plusieurs parties."})
+                    return
+
+                results = []
+                for block in tool_uses:
+                    file, result, is_error = await asyncio.to_thread(generators.run_tool, block.name, block.input)
+                    if file:
+                        files += 1
+                        yield line({"type": "file", "name": file["name"], "kind": file["kind"], "size": file["size"],
+                                    "url": f"/api/files/{file['id']}"})
+                    results.append({"type": "tool_result", "tool_use_id": block.id, "content": result,
+                                    **({"is_error": True} if is_error else {})})
+                params["messages"] = params["messages"] + [
+                    {"role": "assistant", "content": final.content},
+                    {"role": "user", "content": results},
+                ]
+            else:
+                logger.warning("Trop de tours d’outils, arrêt")
+
+            if final is not None and final.stop_reason == "refusal" and not wrote and not files:
                 yield line({"type": "error", "message": "Claude a refusé de répondre à cette demande. Reformule-la."})
-            elif not wrote:
+            elif not wrote and not files:
                 yield line({"type": "error", "message": "Claude a renvoyé une réponse vide. Réessaie ou reformule."})
             else:
-                yield line({"type": "done", "stop_reason": final.stop_reason, "model": final.model})
+                yield line({"type": "done", "stop_reason": final.stop_reason if final else None,
+                            "model": final.model if final else params["model"]})
         except anthropic.AuthenticationError:
             yield line({"type": "error", "message": "Clé API refusée par Anthropic. Vérifie ANTHROPIC_API_KEY."})
         except anthropic.RateLimitError:
@@ -311,6 +366,16 @@ async def chat(
         media_type="application/x-ndjson",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.get("/api/files/{fid}")
+async def download(fid: str):
+    """Téléchargement d'un fichier créé par Claude (lien valable une heure)."""
+    found = generators.load(fid)
+    if not found:
+        raise HTTPException(404, "Ce fichier a expiré ou n’existe pas. Demande à Claude de le recréer.")
+    path, name = found
+    return FileResponse(path, filename=name, media_type=generators.MIME.get(Path(name).suffix, "application/octet-stream"))
 
 
 @app.middleware("http")

@@ -229,6 +229,27 @@ details p { margin: 0 0 0.55rem; font-size: 0.875rem; color: var(--muted); }
 .box.dragging { border-color: var(--cyan); border-style: dashed; box-shadow: var(--glow); }
 .file-err { color: var(--danger); font-size: 0.82rem; margin: 0 0.3rem 0.45rem; }
 
+.status-line {
+  margin-top: 0.6rem; font: 500 0.8rem var(--mono); letter-spacing: 0.04em;
+  background: linear-gradient(90deg, var(--muted) 0%, var(--violet) 50%, var(--muted) 100%) 0 0 / 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 1.6s linear infinite;
+}
+.made-files { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+.made-file {
+  display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: var(--ink);
+  background: #fff; border: 1px solid var(--line-strong); border-radius: 14px; padding: 0.6rem 0.75rem;
+  transition: box-shadow .2s, border-color .2s;
+}
+.made-file:hover { border-color: var(--cyan); box-shadow: var(--glow); }
+.mf-icon {
+  flex: none; width: 3rem; height: 3rem; border-radius: 10px; display: grid; place-items: center;
+  font: 700 0.72rem var(--mono); letter-spacing: 0.05em; color: #fff; background: var(--grad);
+}
+.made-file.xlsx .mf-icon { background: linear-gradient(120deg, #0F9D58, #0891B2); }
+.mf-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.mf-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-size { font: 0.72rem var(--mono); color: var(--muted); }
+.mf-dl { flex: none; font: 600 0.75rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--cyan); }
 @media (max-width: 480px) {
   .attach-label { display: none; }
   .attach { padding: 0.55rem 0.7rem; }
@@ -304,6 +325,6 @@ details p { margin: 0 0 0.55rem; font-size: 0.875rem; color: var(--muted); }
     <p class="hint">Entrée pour envoyer, Maj + Entrée pour aller à la ligne. Glisse des fichiers ici ou clique sur « Joindre un fichier ».</p>
   </div>
 </div>
-<script src="/app.js?v=7"></script>
+<script src="/app.js?v=8"></script>
 </body>
 </html>

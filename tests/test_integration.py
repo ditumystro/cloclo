@@ -50,14 +50,15 @@ def test_chat_sends_conversation_and_system(client, upstream):
     client.post("/api/chat", json={"messages": msgs, "system": "  Sois bref.  "})
     sent = upstream.last
     assert sent["messages"] == msgs
-    assert sent["system"] == "Sois bref."
+    assert sent["system"][0]["text"] == main.generators.SYSTEM_PROMPT
+    assert sent["system"][1]["text"].endswith("Sois bref.")
     assert sent["max_tokens"] == main.MAX_TOKENS
     assert sent["stream"] is True
 
 
-def test_chat_blank_system_is_not_sent(client, upstream):
+def test_chat_blank_user_rules_are_not_sent(client, upstream):
     chat(client, system="   ")
-    assert "system" not in upstream.last
+    assert len(upstream.last["system"]) == 1  # seulement les consignes de l'app
 
 
 @pytest.mark.parametrize("mode", ["rapide", "standard", "approfondi"])

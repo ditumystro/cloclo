@@ -15,8 +15,10 @@ from fastapi.testclient import TestClient
 import main
 
 
-def sse(model: str = "claude-sonnet-5-5", texts=("Bonjour", " le monde"), stop_reason: str = "end_turn") -> bytes:
-    """Construit un flux SSE de l'API Messages, tel qu'Anthropic l'envoie."""
+def sse(model: str = "claude-sonnet-5-5", texts=("Bonjour", " le monde"), stop_reason: str = "end_turn",
+        tool=None) -> bytes:
+    """Construit un flux SSE de l'API Messages, tel qu'Anthropic l'envoie.
+    tool=(nom, entrée) ajoute un appel d'outil après le texte (stop_reason « tool_use »)."""
     events = [
         ("message_start", {"type": "message_start", "message": {
             "id": "msg_test", "type": "message", "role": "assistant", "model": model,
@@ -30,6 +32,17 @@ def sse(model: str = "claude-sonnet-5-5", texts=("Bonjour", " le monde"), stop_r
             events.append(("content_block_delta", {"type": "content_block_delta", "index": 0,
                                                    "delta": {"type": "text_delta", "text": t}}))
         events.append(("content_block_stop", {"type": "content_block_stop", "index": 0}))
+    if tool:
+        name, tool_input = tool
+        idx = 1 if texts else 0
+        raw = tool_input if isinstance(tool_input, str) else json.dumps(tool_input, ensure_ascii=False)
+        events += [
+            ("content_block_start", {"type": "content_block_start", "index": idx, "content_block": {
+                "type": "tool_use", "id": f"toolu_{name}", "name": name, "input": {}}}),
+            ("content_block_delta", {"type": "content_block_delta", "index": idx,
+                                     "delta": {"type": "input_json_delta", "partial_json": raw}}),
+            ("content_block_stop", {"type": "content_block_stop", "index": idx}),
+        ]
     events += [
         ("message_delta", {"type": "message_delta", "delta": {"stop_reason": stop_reason, "stop_sequence": None},
                            "usage": {"output_tokens": 7}}),
@@ -47,6 +60,11 @@ class FakeAnthropic:
         self.body = sse()
         self.error_type = "api_error"
         self.raise_exc: Exception | None = None
+        self.queue: list[bytes] = []  # réponses successives (boucle d'outils)
+
+    def replies(self, *bodies: bytes):
+        """Réponses successives : une par tour de la boucle d'outils."""
+        self.queue = list(bodies)
 
     def reply(self, *, status=200, body=None, error_type="api_error", raise_exc=None, **sse_kwargs):
         self.status, self.error_type, self.raise_exc = status, error_type, raise_exc
@@ -60,7 +78,8 @@ class FakeAnthropic:
         if self.status != 200:
             return httpx.Response(self.status, json={"type": "error", "error": {
                 "type": self.error_type, "message": "erreur simulée"}})
-        return httpx.Response(200, content=self.body, headers={"content-type": "text/event-stream"})
+        body = self.queue.pop(0) if self.queue else self.body
+        return httpx.Response(200, content=body, headers={"content-type": "text/event-stream"})
 
     @property
     def last(self) -> dict:

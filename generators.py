@@ -1,0 +1,319 @@
+"""Création de fichiers à la demande de Claude : PDF (depuis du Markdown) et
+classeurs Excel (feuilles, colonnes, lignes, formules).
+
+Claude fournit le contenu via ses outils create_pdf / create_excel ; ce module
+le met en forme. Les fichiers créés sont gardés une heure, le temps que
+l'utilisateur les télécharge.
+"""
+
+import io
+import re
+import secrets
+import tempfile
+import time
+import unicodedata
+from datetime import date
+from html import escape
+from pathlib import Path
+
+import markdown
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
+from pydantic import BaseModel, Field, field_validator
+from xhtml2pdf import pisa
+
+# ---------------------------------------------------------------- outils pour Claude
+CREATE_PDF_TOOL = {
+    "name": "create_pdf",
+    "description": (
+        "Crée un document PDF téléchargeable pour l'utilisateur, mis en page proprement (A4, titres, "
+        "listes, tableaux, code). Utilise cet outil quand l'utilisateur demande un PDF, un rapport, une "
+        "fiche, une lettre, un CV, un compte rendu ou tout document à télécharger ou imprimer. "
+        "Écris le contenu complet en Markdown : # titres, listes, **gras**, *italique*, tableaux "
+        "Markdown (| a | b |), blocs de code. N'inclus pas le titre principal dans le contenu : il est "
+        "ajouté automatiquement en haut de la première page. Après l'appel, résume en une ou deux "
+        "phrases ce que contient le document ; ne recopie pas son contenu dans ta réponse."
+    ),
+    "eager_input_streaming": True,
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "filename": {"type": "string", "description": "Nom du fichier, ex. « rapport-ventes-2026.pdf »."},
+            "title": {"type": "string", "description": "Titre affiché en haut du document."},
+            "content": {"type": "string", "description": "Contenu complet du document, en Markdown."},
+        },
+        "required": ["filename", "title", "content"],
+    },
+}
+
+CREATE_EXCEL_TOOL = {
+    "name": "create_excel",
+    "description": (
+        "Crée un classeur Excel (.xlsx) téléchargeable : une ou plusieurs feuilles avec en-têtes mis en "
+        "forme, filtres, volets figés et largeurs de colonnes ajustées. Utilise cet outil quand "
+        "l'utilisateur demande un tableau Excel, un tableur, un fichier .xlsx, un budget, un planning, "
+        "un inventaire ou des données à trier et calculer. Mets les nombres comme nombres (pas en texte), "
+        "les dates au format AAAA-MM-JJ, et les calculs comme formules Excel en anglais commençant par "
+        "« = » (ex. « =SUM(B2:B10) », « =B2*C2 »), en tenant compte que la ligne 1 contient les en-têtes "
+        "et que les données commencent ligne 2. Après l'appel, résume brièvement le contenu du fichier."
+    ),
+    "eager_input_streaming": True,
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "filename": {"type": "string", "description": "Nom du fichier, ex. « budget-2026.xlsx »."},
+            "sheets": {
+                "type": "array",
+                "description": "Les feuilles du classeur.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Nom de la feuille (31 caractères max)."},
+                        "columns": {"type": "array", "items": {"type": "string"}, "description": "En-têtes."},
+                        "rows": {
+                            "type": "array",
+                            "description": "Lignes de données ; chaque ligne a une valeur par colonne.",
+                            "items": {"type": "array", "items": {"type": ["string", "number", "boolean", "null"]}},
+                        },
+                        "number_formats": {
+                            "type": "object",
+                            "description": "Format Excel par en-tête de colonne, ex. {\"Prix\": \"#,##0.00 €\", \"Taux\": \"0%\"}.",
+                            "additionalProperties": {"type": "string"},
+                        },
+                    },
+                    "required": ["name", "columns", "rows"],
+                },
+            },
+        },
+        "required": ["filename", "sheets"],
+    },
+}
+
+TOOLS = [CREATE_PDF_TOOL, CREATE_EXCEL_TOOL]
+
+SYSTEM_PROMPT = (
+    "Tu es cloclo, un assistant qui peut aussi créer des fichiers à télécharger : des PDF (outil "
+    "create_pdf) et des classeurs Excel (outil create_excel). Quand l'utilisateur demande un document "
+    "ou un tableau à télécharger, crée-le avec l'outil adapté au lieu d'écrire seulement le contenu "
+    "dans la conversation. Le lien de téléchargement s'affiche automatiquement sous ta réponse. "
+    "Tu ne peux pas créer d'images ni d'autres types de fichiers ; si on te le demande, dis-le simplement. "
+    "Dans l'historique de la conversation, la mention « [Fichier créé : nom] » à la fin de tes réponses "
+    "précédentes indique un fichier que tu as réellement créé et que l'utilisateur a déjà reçu : ne le "
+    "recrée pas, sauf s'il demande une nouvelle version."
+)
+
+
+# ---------------------------------------------------------------- validation des entrées
+MAX_PDF_CHARS = 200_000
+MAX_ROWS = 10_000
+MAX_COLS = 200
+MAX_SHEETS = 20
+
+Cell = str | int | float | bool | None
+
+
+class PdfInput(BaseModel):
+    filename: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=300)
+    content: str = Field(min_length=1, max_length=MAX_PDF_CHARS)
+
+
+class SheetInput(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    columns: list[str] = Field(min_length=1, max_length=MAX_COLS)
+    rows: list[list[Cell]] = Field(default_factory=list, max_length=MAX_ROWS)
+    number_formats: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("rows")
+    @classmethod
+    def rows_fit_columns(cls, rows, info):
+        ncols = len(info.data.get("columns") or [])
+        for i, row in enumerate(rows, start=2):
+            if len(row) > ncols:
+                raise ValueError(f"la ligne {i} a {len(row)} valeurs pour {ncols} colonnes")
+        return rows
+
+
+class ExcelInput(BaseModel):
+    filename: str = Field(min_length=1, max_length=200)
+    sheets: list[SheetInput] = Field(min_length=1, max_length=MAX_SHEETS)
+
+
+def safe_filename(name: str, ext: str) -> str:
+    """Nom de fichier sûr (pas de chemin, pas de caractères spéciaux), avec la bonne extension."""
+    stem = Path(name.replace("\\", "/")).name
+    if stem.lower().endswith(ext):
+        stem = stem[: -len(ext)]
+    stem = unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode()
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", stem).strip("-._")[:80] or "document"
+    return stem + ext
+
+
+# ---------------------------------------------------------------- PDF
+PDF_CSS = """
+@page { size: a4 portrait; margin: 2cm 1.8cm 2.2cm 1.8cm;
+  @frame footer { -pdf-frame-content: footer; bottom: 0.9cm; margin-left: 1.8cm; margin-right: 1.8cm; height: 0.8cm; } }
+body { font-family: Helvetica; font-size: 10.5pt; line-height: 1.45; color: #0B1020; }
+h1.doc-title { font-size: 21pt; color: #5B21B6; margin: 0 0 4pt 0; padding-bottom: 6pt; border-bottom: 2pt solid #0891B2; }
+p.doc-date { color: #5B6480; font-size: 9pt; margin: 0 0 14pt 0; }
+h1 { font-size: 16pt; color: #0B1020; margin: 14pt 0 6pt 0; }
+h2 { font-size: 13.5pt; color: #5B21B6; margin: 12pt 0 5pt 0; }
+h3 { font-size: 11.5pt; color: #0891B2; margin: 10pt 0 4pt 0; }
+h1, h2, h3, h4 { -pdf-keep-with-next: true; }
+p { margin: 0 0 7pt 0; }
+ul, ol { margin: 0 0 7pt 0; }
+li { margin-bottom: 2pt; }
+code { font-family: Courier; font-size: 9.5pt; background-color: #F1F4FB; }
+pre { font-family: Courier; font-size: 9pt; background-color: #F1F4FB; border: 0.5pt solid #D5DAE4; padding: 6pt; }
+table { width: 100%; margin: 4pt 0 10pt 0; }
+th { background-color: #5B21B6; color: #FFFFFF; font-weight: bold; padding: 4pt; border: 0.5pt solid #5B21B6; text-align: left; }
+td { padding: 4pt; border: 0.5pt solid #D5DAE4; vertical-align: top; }
+blockquote { color: #5B6480; border-left: 2pt solid #0891B2; padding-left: 8pt; margin-left: 0; }
+hr { color: #D5DAE4; }
+#footer { font-size: 8pt; color: #8A93AE; text-align: right; }
+"""
+
+
+def build_pdf(data: PdfInput) -> bytes:
+    body = markdown.markdown(data.content, extensions=["tables", "fenced_code", "sane_lists", "nl2br"])
+    today = date.today().strftime("%d/%m/%Y")
+    html = f"""<html><head><meta charset="utf-8"><style>{PDF_CSS}</style></head><body>
+<div id="footer">{escape(data.title)} · page <pdf:pagenumber> / <pdf:pagecount></div>
+<h1 class="doc-title">{escape(data.title)}</h1><p class="doc-date">{today}</p>
+{body}</body></html>"""
+    out = io.BytesIO()
+    result = pisa.CreatePDF(html, dest=out, encoding="utf-8")
+    if result.err:
+        raise ValueError("la mise en page du PDF a échoué")
+    return out.getvalue()
+
+
+# ---------------------------------------------------------------- Excel
+HEADER_FILL = PatternFill("solid", fgColor="5B21B6")
+HEADER_FONT = Font(bold=True, color="FFFFFF")
+THIN = Side(style="thin", color="D5DAE4")
+ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _sheet_title(name: str, used: set[str]) -> str:
+    title = re.sub(r"[\[\]:*?/\\]", "-", name).strip("'") or "Feuille"
+    title = title[:31]
+    base, n = title, 2
+    while title.lower() in used:
+        suffix = f" ({n})"
+        title = base[: 31 - len(suffix)] + suffix
+        n += 1
+    used.add(title.lower())
+    return title
+
+
+def _cell_value(value: Cell):
+    """Nombres et formules restent tels quels ; les dates AAAA-MM-JJ deviennent de vraies dates."""
+    if isinstance(value, str):
+        if ISO_DATE.match(value):
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return value
+        return value[:32_767]
+    return value
+
+
+def build_excel(data: ExcelInput) -> bytes:
+    wb = Workbook()
+    wb.remove(wb.active)
+    used: set[str] = set()
+    for sheet in data.sheets:
+        ws = wb.create_sheet(_sheet_title(sheet.name, used))
+        ws.append(sheet.columns)
+        for row in sheet.rows:
+            ws.append([_cell_value(v) for v in row])
+
+        ncols = len(sheet.columns)
+        for col in range(1, ncols + 1):
+            head = ws.cell(row=1, column=col)
+            head.fill, head.font = HEADER_FILL, HEADER_FONT
+            head.alignment = Alignment(vertical="center", wrap_text=True)
+            head.border = Border(bottom=THIN)
+        ws.row_dimensions[1].height = 22
+        ws.freeze_panes = "A2"
+        if sheet.rows:
+            ws.auto_filter.ref = f"A1:{get_column_letter(ncols)}{len(sheet.rows) + 1}"
+
+        formats = {k.strip().lower(): v for k, v in sheet.number_formats.items()}
+        for col, header in enumerate(sheet.columns, start=1):
+            letter = get_column_letter(col)
+            fmt = formats.get(header.strip().lower())
+            width = len(str(header))
+            for cell in ws[letter][1:]:
+                if isinstance(cell.value, date):
+                    cell.number_format = fmt or "DD/MM/YYYY"
+                elif fmt:
+                    cell.number_format = fmt
+                shown = 12 if isinstance(cell.value, str) and cell.value.startswith("=") else len(str(cell.value or ""))
+                width = max(width, shown)
+            ws.column_dimensions[letter].width = min(max(width + 2, 8), 60)
+
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+# ---------------------------------------------------------------- stockage temporaire
+FILE_TTL = 3600  # une heure
+FILES_DIR = Path(tempfile.gettempdir()) / "cloclo-files"
+MIME = {".pdf": "application/pdf",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+
+
+def _cleanup() -> None:
+    if not FILES_DIR.exists():
+        return
+    now = time.time()
+    for path in FILES_DIR.iterdir():
+        try:
+            if now - path.stat().st_mtime > FILE_TTL:
+                path.unlink()
+        except OSError:
+            pass
+
+
+def store(content: bytes, filename: str) -> str:
+    """Enregistre le fichier et renvoie un identifiant impossible à deviner."""
+    _cleanup()
+    FILES_DIR.mkdir(parents=True, exist_ok=True)
+    fid = secrets.token_urlsafe(18)
+    (FILES_DIR / f"{fid}__{filename}").write_bytes(content)
+    return fid
+
+
+def load(fid: str) -> tuple[Path, str] | None:
+    if not re.fullmatch(r"[A-Za-z0-9_-]{20,40}", fid or ""):
+        return None
+    matches = list(FILES_DIR.glob(f"{fid}__*")) if FILES_DIR.exists() else []
+    if not matches or time.time() - matches[0].stat().st_mtime > FILE_TTL:
+        return None
+    path = matches[0]
+    return path, path.name.split("__", 1)[1]
+
+
+# ---------------------------------------------------------------- exécution d'un outil
+def run_tool(name: str, raw_input) -> tuple[dict | None, str, bool]:
+    """Exécute un outil. Renvoie (fichier ou None, texte du résultat pour Claude, erreur ?)."""
+    try:
+        if name == "create_pdf":
+            data = PdfInput.model_validate(raw_input)
+            filename, content, kind = safe_filename(data.filename, ".pdf"), build_pdf(data), "pdf"
+        elif name == "create_excel":
+            data = ExcelInput.model_validate(raw_input)
+            filename, content, kind = safe_filename(data.filename, ".xlsx"), build_excel(data), "xlsx"
+        else:
+            return None, f"Outil inconnu : {name}", True
+    except ValueError as e:  # inclut les erreurs de validation pydantic
+        return None, f"Entrée invalide, corrige-la et réessaie : {str(e)[:1500]}", True
+
+    fid = store(content, filename)
+    file = {"id": fid, "name": filename, "kind": kind, "size": len(content)}
+    size = f"{max(1, len(content) // 1000)} Ko"
+    return file, f"Fichier créé : {filename} ({size}). L’utilisateur voit le lien de téléchargement.", False

@@ -15,8 +15,8 @@
 
   const SUGGESTIONS = [
     "Explique-moi le RAG en trois phrases.",
-    "Écris une fonction Python qui dédoublonne une liste en gardant l’ordre.",
-    "Donne-moi cinq idées de noms pour une boutique en ligne.",
+    "Fais-moi un PDF : fiche recette des crêpes pour 4 personnes.",
+    "Crée un tableau Excel de budget mensuel avec les totaux calculés.",
   ];
 
   // ------------------------------------------------ préférences locales
@@ -124,6 +124,43 @@
     view.meta.classList.remove("hidden");
   }
 
+  function showStatus(view, text) {
+    let el = view.el.querySelector(".status-line");
+    if (!text) { el?.remove(); return; }
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "status-line";
+      view.el.insertBefore(el, view.meta);
+    }
+    el.textContent = text;
+  }
+
+  function addFileCard(view, f) {
+    let box = view.el.querySelector(".made-files");
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "made-files";
+      view.el.insertBefore(box, view.meta);
+    }
+    const a = document.createElement("a");
+    a.className = "made-file " + f.kind;
+    a.href = f.url;
+    a.download = f.name;
+    const icon = document.createElement("span");
+    icon.className = "mf-icon"; icon.textContent = f.kind === "pdf" ? "PDF" : "XLSX";
+    const info = document.createElement("span");
+    info.className = "mf-info";
+    const name = document.createElement("span");
+    name.className = "mf-name"; name.textContent = f.name;
+    const size = document.createElement("span");
+    size.className = "mf-size"; size.textContent = fmtSize(f.size) + " · lien valable 1 h";
+    info.append(name, size);
+    const dl = document.createElement("span");
+    dl.className = "mf-dl"; dl.textContent = "Télécharger ↓";
+    a.append(icon, info, dl);
+    box.appendChild(a);
+  }
+
   function addNote(view, text) {
     const s = document.createElement("span");
     s.textContent = text;
@@ -181,6 +218,7 @@
     let full = "";
     let failed = null;
     let stopReason = null;
+    const made = []; // fichiers créés par Claude pendant cette réponse
 
     try {
       const headers = { "Content-Type": "application/json" };
@@ -220,6 +258,8 @@
           if (!raw.trim()) continue;
           const ev = JSON.parse(raw);
           if (ev.type === "text") { full += ev.text; view.body.innerHTML = md(full); }
+          else if (ev.type === "status") { showStatus(view, ev.text); }
+          else if (ev.type === "file") { made.push(ev); addFileCard(view, ev); showStatus(view, ""); }
           else if (ev.type === "done") { stopReason = ev.stop_reason; }
           else if (ev.type === "error") { failed = ev.message; }
         }
@@ -229,10 +269,13 @@
       else failed = e.message || "Impossible de joindre le serveur.";
     }
 
-    if (full) {
-      view.body.innerHTML = md(full);
-      turns.push({ role: "assistant", content: full });
-      addCopy(view, full);
+    showStatus(view, "");
+    if (full || made.length) {
+      view.body.innerHTML = full ? md(full) : "";
+      // Claude se souvient des fichiers qu'il a créés dans la suite de la conversation
+      const note = made.map((f) => `[Fichier créé : ${f.name}]`).join("\n");
+      turns.push({ role: "assistant", content: [full, note].filter(Boolean).join("\n\n") });
+      if (full) addCopy(view, full);
       if (stopReason === "max_tokens") addNote(view, "Réponse coupée : demande moins à la fois.");
     } else {
       turns.pop(); // pas de réponse : le message ne reste pas dans le contexte

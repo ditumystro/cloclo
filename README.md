@@ -30,6 +30,19 @@ Limites : 10 fichiers par message, `MAX_UPLOAD_MB` (20 Mo) au total par conversa
 Les fichiers restent dans la conversation : Claude s'en souvient aux messages suivants.
 Ils sont renvoyés à chaque message, avec mise en cache pour ne pas les repayer plein tarif.
 
+## Création de fichiers (PDF et Excel)
+
+Demande simplement un document dans le chat, par exemple « fais-moi un PDF de… » ou
+« crée un tableau Excel de… ». Claude utilise ses outils :
+
+| Outil | Résultat |
+|---|---|
+| `create_pdf` | PDF A4 mis en page (titre, date, titres, listes, tableaux, code, numéros de page) depuis du Markdown |
+| `create_excel` | classeur `.xlsx` : plusieurs feuilles, en-têtes stylés, filtres, volets figés, vraies dates, formules (`=SUM(...)`), formats (`#,##0.00 €`, `0%`) |
+
+Le fichier apparaît sous la réponse avec un bouton **Télécharger**. Les liens restent valables
+une heure (ensuite, demande à Claude de recréer le fichier). Pas de génération d'images.
+
 ## Accès sur approbation
 
 Définis `OWNER_EMAIL` pour rendre l'app privée :
@@ -56,6 +69,7 @@ pytest
 ```
 
 - `tests/test_unit.py` : mot de passe, limite de débit, clé API, schémas.
+- `tests/test_files.py` : génération PDF/Excel, boucle d'outils du chat, téléchargement.
 - `tests/test_attachments.py` : fichiers joints (PDF, images, Word, texte), limites, erreurs.
 - `tests/test_access.py` : demande d'accès, alerte, approbation, lien personnel, révocation.
 - `tests/test_integration.py` : requêtes HTTP vers l'app, avec le vrai SDK
