@@ -5,7 +5,9 @@ personnel et permanent, qui débloque l'app sur n'importe quel appareil.
 
 Pas de base de données : les accès sont des jetons signés (HMAC) avec
 ACCESS_SECRET, valables après un redémarrage. La liste des e-mails approuvés
-(fichier ACCESS_STORE) sert seulement à éviter les demandes en double.
+sert à éviter les demandes en double ; elle est gardée dans une liste de
+contacts Brevo (qui survit aux déploiements Render), ou dans le fichier
+ACCESS_STORE quand Brevo n'est pas configuré (en local).
 """
 
 import asyncio
@@ -19,6 +21,8 @@ import os
 import secrets
 import smtplib
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 from email.message import EmailMessage
 from pathlib import Path
@@ -54,6 +58,9 @@ GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "")
 
 # Fichier des e-mails déjà approuvés (évite qu'une personne approuvée redemande).
 ACCESS_STORE = os.environ.get("ACCESS_STORE", "data/approved.json")
+# Liste de contacts Brevo des personnes approuvées (créée automatiquement si absente).
+BREVO_LIST_NAME = os.environ.get("BREVO_LIST_NAME", "cloclo – accès approuvés")
+BREVO_API = "https://api.brevo.com/v3"
 
 REQUEST_TTL = 7 * 24 * 3600      # une demande (et son lien d'approbation) expire au bout de 7 jours
 REQUESTS_PER_HOUR = 3            # par IP, pour éviter qu'on inonde ta boîte mail
@@ -132,6 +139,7 @@ def _store_path() -> Path:
 
 
 def approved_emails() -> dict[str, dict]:
+    """Approbations connues localement (mémoire + fichier)."""
     global _approved
     if _approved is None:
         try:
@@ -141,7 +149,7 @@ def approved_emails() -> dict[str, dict]:
     return _approved
 
 
-def remember_approval(email: str, rid: str, name: str) -> None:
+def _save_local(email: str, rid: str, name: str) -> None:
     approved_emails()[email.lower()] = {"id": rid, "name": name}
     try:
         path = _store_path()
@@ -151,6 +159,74 @@ def remember_approval(email: str, rid: str, name: str) -> None:
         tmp.replace(path)
     except OSError:
         logger.exception("Impossible d’enregistrer %s", ACCESS_STORE)
+
+
+# ---- stockage durable dans Brevo (contacts)
+_brevo_list_id: int | None = None
+
+
+def _brevo(method: str, path: str, body: dict | None = None):
+    """Appel à l'API Brevo. Renvoie le JSON (ou None si vide) ; 404 -> KeyError."""
+    req = urllib.request.Request(
+        BREVO_API + path, method=method,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={"api-key": BREVO_API_KEY, "Content-Type": "application/json", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise KeyError(path) from e
+        raise
+    return json.loads(raw) if raw else None
+
+
+def _brevo_list() -> int:
+    """Identifiant de la liste des approuvés ; la crée (avec un dossier) si besoin."""
+    global _brevo_list_id
+    if _brevo_list_id is None:
+        lists = (_brevo("GET", "/contacts/lists?limit=50&offset=0") or {}).get("lists") or []
+        found = next((l["id"] for l in lists if l.get("name") == BREVO_LIST_NAME), None)
+        if found is None:
+            folders = (_brevo("GET", "/contacts/folders?limit=50&offset=0") or {}).get("folders") or []
+            folder = folders[0]["id"] if folders else _brevo("POST", "/contacts/folders", {"name": "cloclo"})["id"]
+            found = _brevo("POST", "/contacts/lists", {"name": BREVO_LIST_NAME, "folderId": folder})["id"]
+        _brevo_list_id = found
+    return _brevo_list_id
+
+
+def lookup_approval(email: str) -> dict | None:
+    """L'e-mail a-t-il déjà été approuvé ? Mémoire d'abord, puis Brevo."""
+    known = approved_emails().get(email.lower())
+    if known or not BREVO_API_KEY:
+        return known
+    try:
+        list_id = _brevo_list()
+        contact = _brevo("GET", "/contacts/" + urllib.parse.quote(email.lower(), safe=""))
+    except KeyError:
+        return None
+    except Exception:
+        # Brevo injoignable : on traite la demande comme nouvelle (tu reçois une alerte).
+        logger.exception("Lecture des approbations Brevo impossible")
+        return None
+    if list_id not in (contact or {}).get("listIds", []):
+        return None
+    name = ((contact.get("attributes") or {}).get("FIRSTNAME") or "").strip() or email.split("@")[0]
+    found = {"id": f"brevo-{contact.get('id', '')}", "name": name}
+    approved_emails()[email.lower()] = found  # cache local
+    return found
+
+
+def remember_approval(email: str, rid: str, name: str) -> None:
+    _save_local(email, rid, name)
+    if not BREVO_API_KEY:
+        return
+    try:
+        _brevo("POST", "/contacts", {"email": email.lower(), "attributes": {"FIRSTNAME": name},
+                                     "listIds": [_brevo_list()], "updateEnabled": True})
+    except Exception:
+        logger.exception("Impossible d’enregistrer l’approbation de %s dans Brevo", email)
 
 
 def pending_for(email: str) -> str | None:
@@ -282,7 +358,7 @@ async def request_access(body: AccessRequest, request: Request):
     name, email, message = body.name.strip(), body.email.strip(), body.message.strip()
 
     # Déjà approuvé : pas de nouvelle alerte, on renvoie son lien personnel.
-    known = approved_emails().get(email.lower())
+    known = await asyncio.to_thread(lookup_approval, email)
     if known:
         await send_access_link(request, known["id"], known["name"], email)
         return {"status": "already_approved"}
@@ -371,7 +447,7 @@ async def decide(request: Request, t: str = Form(...), action: str = Form(...)):
     _requests[data["id"]] = {"name": data["name"], "email": email, "status": status}
     name = html.escape(data["name"])
     if status == "approved":
-        remember_approval(email, data["id"], data["name"])
+        await asyncio.to_thread(remember_approval, email, data["id"], data["name"])
         sent = await send_access_link(request, data["id"], data["name"], email)
         mail = (f"Son lien d’accès personnel lui a été envoyé à {html.escape(email)}." if sent
                 else "⚠ L’e-mail avec son lien n’a pas pu partir (vérifie la configuration e-mail).")

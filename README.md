@@ -54,6 +54,10 @@ Définis `OWNER_EMAIL` pour rendre l'app privée :
 4. S'il redemande avec le même e-mail, tu ne reçois rien : son lien lui est renvoyé.
 
 Pour retirer un accès, ajoute son e-mail à `REVOKED_ACCESS`.
+
+La liste des personnes approuvées est gardée dans **Brevo** (liste de contacts
+« cloclo – accès approuvés », créée automatiquement), donc elle survit aux déploiements
+Render. Sans `BREVO_API_KEY` (en local), elle est gardée dans `data/approved.json`.
 Envoi des e-mails :
 - **En production sur Render (offre gratuite)** : `BREVO_API_KEY` (https://www.brevo.com, gratuit,
   300 e-mails/jour). Render bloque les ports e-mail (SMTP) de son offre gratuite depuis septembre 2025,
