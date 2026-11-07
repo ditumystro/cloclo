@@ -108,6 +108,7 @@ def clean_state(monkeypatch):
     monkeypatch.setattr(main.access, "REVOKED", set())
     monkeypatch.setattr(main.access, "BREVO_API_KEY", "")
     monkeypatch.setattr(main.access, "_brevo_list_id", None)
+    main.access._negative.clear()
     main.access._requests.clear()
     main.access._request_hits.clear()
     monkeypatch.setattr(main, "RATE_LIMIT_PER_MIN", 20)

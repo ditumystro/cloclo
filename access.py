@@ -122,6 +122,11 @@ def is_revoked(grant: dict) -> bool:
     return grant.get("id") in REVOKED or grant.get("email", "").lower() in {r.lower() for r in REVOKED}
 
 
+def request_token(rid: str, name: str, email: str) -> str:
+    """Jeton gardé par la page du visiteur pendant qu'il attend l'approbation."""
+    return sign({"kind": "request", "id": rid, "name": name, "email": email, "iat": int(time.time())})
+
+
 def grant_token(rid: str, name: str, email: str) -> str:
     return sign({"kind": "grant", "id": rid, "name": name, "email": email, "iat": int(time.time())})
 
@@ -218,7 +223,26 @@ def lookup_approval(email: str) -> dict | None:
     return found
 
 
+_negative: dict[str, float] = {}
+NEGATIVE_TTL = 30  # secondes entre deux vérifications Brevo pour un e-mail pas (encore) approuvé
+
+
+def lookup_approval_throttled(email: str) -> dict | None:
+    key = email.lower()
+    if key in approved_emails():
+        return approved_emails()[key]
+    if time.time() - _negative.get(key, 0) < NEGATIVE_TTL:
+        return None
+    found = lookup_approval(email)
+    if found:
+        _negative.pop(key, None)
+    else:
+        _negative[key] = time.time()
+    return found
+
+
 def remember_approval(email: str, rid: str, name: str) -> None:
+    _negative.pop(email.lower(), None)
     _save_local(email, rid, name)
     if not BREVO_API_KEY:
         return
@@ -366,7 +390,7 @@ async def request_access(body: AccessRequest, request: Request):
     # Déjà une demande en attente pour cet e-mail : on ne te dérange pas deux fois.
     rid = pending_for(email)
     if rid:
-        return {"status": "pending", "request_token": sign({"kind": "request", "id": rid, "iat": int(time.time())})}
+        return {"status": "pending", "request_token": request_token(rid, name, email)}
 
     rid = secrets.token_urlsafe(6)
     _requests[rid] = {"name": name, "email": email, "status": "pending"}
@@ -378,7 +402,7 @@ async def request_access(body: AccessRequest, request: Request):
         logger.warning("Demande d’accès de %s (%s) — e-mail non envoyé. Lien : %s", name, rid, link)
 
     return {"status": "pending", "notified": sent,
-            "request_token": sign({"kind": "request", "id": rid, "iat": int(time.time())})}
+            "request_token": request_token(rid, name, email)}
 
 
 @router.get("/api/access/check")
@@ -396,11 +420,21 @@ async def access_status(x_access_request: str | None = Header(default=None)):
     if not req:
         raise HTTPException(400, "Demande inconnue ou expirée. Refais une demande d’accès.")
     entry = _requests.get(req["id"])
-    if not entry:
-        return {"status": "unknown"}  # serveur redémarré avant la réponse : refaire une demande
-    if entry["status"] == "approved":
+    if entry and entry["status"] == "approved":
         return {"status": "approved", "access_token": grant_token(req["id"], entry["name"], entry.get("email", ""))}
-    return {"status": entry["status"]}
+    if entry and entry["status"] == "denied":
+        return {"status": "denied"}
+
+    email = req.get("email")
+    if not email:
+        # Ancien jeton (sans e-mail) dont le serveur a oublié la demande.
+        return {"status": "pending"} if entry else {"status": "unknown"}
+    # Le serveur a pu redémarrer (veille de Render) depuis ton approbation : on vérifie
+    # la liste durable des personnes approuvées, sans dépendre de la mémoire.
+    known = await asyncio.to_thread(lookup_approval_throttled, email)
+    if known:
+        return {"status": "approved", "access_token": grant_token(req["id"], req.get("name") or known["name"], email)}
+    return {"status": "pending"}  # ton lien d'approbation reste valable 7 jours
 
 
 def _page(title: str, body: str) -> HTMLResponse:

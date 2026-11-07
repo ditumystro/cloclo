@@ -192,10 +192,66 @@ def test_approval_works_even_if_request_was_forgotten(client, approval):
     assert client.get("/api/access/status", headers={"X-Access-Request": req_token}).json()["status"] == "approved"
 
 
-def test_unknown_after_restart(client, approval):
+def test_still_pending_after_restart(client, approval):
+    """Le serveur a oublié la demande, mais le lien d'approbation reste valable : on attend."""
     req_token = request_access(client)
     access._requests.clear()
-    assert client.get("/api/access/status", headers={"X-Access-Request": req_token}).json() == {"status": "unknown"}
+    assert client.get("/api/access/status", headers={"X-Access-Request": req_token}).json() == {"status": "pending"}
+
+
+def status(client, token):
+    return client.get("/api/access/status", headers={"X-Access-Request": token}).json()
+
+
+def wipe_memory():
+    """Veille ou redémarrage Render : la mémoire est vidée (la liste durable reste)."""
+    access._requests.clear()
+    access._approved = None
+    access._negative.clear()
+
+
+def test_page_unlocks_when_visitor_returns_after_server_slept(client, upstream, approval):
+    """Le bug signalé : approuvé pendant que le serveur dormait, la page redemandait l'accès."""
+    req = request_access(client, "Ana")
+    client.post("/api/access/decide", data={"t": decide_link(approval), "action": "approve"})
+    wipe_memory()                                   # Render s'endort, puis le visiteur revient
+    s = status(client, req)
+    assert s["status"] == "approved"
+    assert chat(client, headers={"X-Access-Token": s["access_token"]}).status_code == 200
+
+
+def test_approval_while_server_restarted_twice(client, approval):
+    req = request_access(client, "Ana")
+    wipe_memory()                                   # endormi avant l'approbation
+    client.post("/api/access/decide", data={"t": decide_link(approval), "action": "approve"})
+    wipe_memory()                                   # et encore après
+    assert status(client, req)["status"] == "approved"
+
+
+def test_pending_poll_does_not_hammer_the_store(client, approval, monkeypatch):
+    calls = []
+    real = access.lookup_approval
+    monkeypatch.setattr(access, "lookup_approval", lambda e: calls.append(e) or real(e))
+    req = request_access(client, "Ana")
+    access._requests.clear()
+    before = len(calls)                             # la demande elle-même vérifie une fois
+    for _ in range(5):
+        assert status(client, req)["status"] == "pending"
+    assert len(calls) - before == 1                 # puis une vérification toutes les 30 s max
+
+
+def test_new_approval_is_seen_despite_negative_cache(client, approval):
+    req = request_access(client, "Ana")
+    access._requests.clear()
+    assert status(client, req)["status"] == "pending"          # met en cache « pas approuvé »
+    client.post("/api/access/decide", data={"t": decide_link(approval), "action": "approve"})
+    access._requests.clear()
+    assert status(client, req)["status"] == "approved"         # l'approbation vide ce cache
+
+
+def test_old_request_token_without_email_still_handled(client, approval):
+    old = access.sign({"kind": "request", "id": "ancien", "iat": int(__import__("time").time())})
+    assert status(client, old) == {"status": "unknown"}
 
 
 def test_request_token_cannot_be_used_as_access(client, upstream, approval):
