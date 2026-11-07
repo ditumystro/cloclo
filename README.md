@@ -30,14 +30,15 @@ Limites : 10 fichiers par message, `MAX_UPLOAD_MB` (20 Mo) au total par conversa
 Les fichiers restent dans la conversation : Claude s'en souvient aux messages suivants.
 Ils sont renvoyés à chaque message, avec mise en cache pour ne pas les repayer plein tarif.
 
-## Création de fichiers (PDF et Excel)
+## Création de fichiers (PDF, Word et Excel)
 
 Demande simplement un document dans le chat, par exemple « fais-moi un PDF de… » ou
-« crée un tableau Excel de… ». Claude utilise ses outils :
+« crée un tableau Excel de… » ou « une lettre en Word… ». Claude utilise ses outils :
 
 | Outil | Résultat |
 |---|---|
 | `create_pdf` | PDF A4 mis en page (titre, date, titres, listes, tableaux, code, numéros de page) depuis du Markdown |
+| `create_word` | document Word `.docx` modifiable : vrais styles de titres, listes à puces et numérotées, tableaux, citations, code, numéros de page |
 | `create_excel` | classeur `.xlsx` : plusieurs feuilles, en-têtes stylés, filtres, volets figés, vraies dates, formules (`=SUM(...)`), formats (`#,##0.00 €`, `0%`) |
 
 Le fichier apparaît sous la réponse avec un bouton **Télécharger**. Les liens restent valables

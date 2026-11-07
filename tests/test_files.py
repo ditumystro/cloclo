@@ -123,7 +123,7 @@ def files_dir(tmp_path, monkeypatch):
 def test_chat_sends_tools(client, upstream):
     chat(client)
     names = [t["name"] for t in upstream.last["tools"]]
-    assert names == ["create_pdf", "create_excel"]
+    assert names == ["create_pdf", "create_word", "create_excel"]
     assert all(t["eager_input_streaming"] for t in upstream.last["tools"])
 
 
@@ -200,3 +200,108 @@ def test_download_unknown_file_is_404(client):
 def test_system_prompt_explains_file_notes_in_history():
     """Sans cette consigne, Claude recrée au tour suivant un fichier qu'il a déjà livré."""
     assert "[Fichier créé : nom]" in g.SYSTEM_PROMPT and "ne le recrée pas" in g.SYSTEM_PROMPT
+
+
+# ------------------------------------------------------------ Word (.docx)
+from docx import Document  # noqa: E402
+
+WORD_MD = """## Introduction
+
+Texte avec **gras**, *italique* et `code`, accents : été, €, « ok ».
+
+1. Premier
+2. Deuxième
+    - sous-point
+3. Troisième
+
+- Puce A
+- Puce B
+
+| Nom | Âge |
+|---|---|
+| Zoé | 31 |
+
+> Une citation.
+
+```python
+print("bonjour")
+```
+
+## Autre liste
+
+1. Doit repartir à 1
+2. Suite
+"""
+
+
+def word(content=WORD_MD, title="Rapport été 2026"):
+    return Document(io.BytesIO(g.build_word(g.PdfInput(filename="x", title=title, content=content))))
+
+
+def test_word_title_headings_and_text():
+    doc = word()
+    styles = [(p.style.name, p.text) for p in doc.paragraphs]
+    assert styles[0] == ("Title", "Rapport été 2026")
+    assert ("Heading 2", "Introduction") in styles and ("Heading 2", "Autre liste") in styles
+    body = next(p for p in doc.paragraphs if p.text.startswith("Texte avec"))
+    assert body.text == "Texte avec gras, italique et code, accents : été, €, « ok »."
+    bold = [r.text for r in body.runs if r.bold]
+    italic = [r.text for r in body.runs if r.italic]
+    assert bold == ["gras"] and italic == ["italique"]
+
+
+def test_word_lists_are_real_word_lists():
+    styles = [(p.style.name, p.text) for p in word().paragraphs]
+    assert ("List Number", "Premier") in styles and ("List Number", "Deuxième") in styles
+    assert ("List Bullet 2", "sous-point") in styles
+    assert ("List Bullet", "Puce A") in styles
+
+
+def test_word_numbered_lists_restart_at_one():
+    doc = word()
+    firsts = [p for p in doc.paragraphs if p.text in ("Premier", "Doit repartir à 1")]
+    ids = [p._p.pPr.numPr.numId.val for p in firsts]
+    assert ids[0] != ids[1]  # chaque liste a sa propre numérotation
+
+
+def test_word_table_with_styled_header():
+    table = word().tables[0]
+    assert [c.text for c in table.rows[0].cells] == ["Nom", "Âge"]
+    assert [c.text for c in table.rows[1].cells] == ["Zoé", "31"]
+    assert all(r.bold for r in table.rows[0].cells[0].paragraphs[0].runs)
+    assert 'w:fill="5B21B6"' in table.rows[0].cells[0]._tc.xml
+
+
+def test_word_quote_code_and_page_numbers():
+    doc = word()
+    assert any(p.style.name == "Quote" and p.text == "Une citation." for p in doc.paragraphs)
+    assert any(p.text == 'print("bonjour")' for p in doc.paragraphs)
+    footer = doc.sections[0].footer.paragraphs[0]._p.xml
+    assert "PAGE" in footer and "NUMPAGES" in footer
+    assert abs(doc.sections[0].page_width.cm - 21) < 0.1  # A4
+
+
+def test_word_keeps_line_breaks_like_the_pdf():
+    """Adresse ou signature sur plusieurs lignes : chaque ligne reste une ligne."""
+    doc = word("Jean Dupont\n12 rue des Lilas\n75001 Paris\n\n1. A\n2. B\n    - sous\n")
+    texts = [p.text for p in doc.paragraphs][2:]
+    assert texts == ["Jean Dupont\n12 rue des Lilas\n75001 Paris", "A", "B", "sous"]
+
+
+def test_word_tool_and_download(client, upstream):
+    upstream.replies(sse(texts=(), stop_reason="tool_use", tool=("create_word", {
+        "filename": "Lettre de motivation", "title": "Lettre", "content": "Madame, Monsieur,\n\nBonjour."})),
+        sse(texts=["Ta lettre est prête."]))
+    events = read_events(chat(client, "Fais-moi une lettre en Word"))
+    file = next(e for e in events if e["type"] == "file")
+    assert file["name"] == "Lettre-de-motivation.docx" and file["kind"] == "docx"
+    assert any(e["type"] == "status" and "Word" in e["text"] for e in events)
+    r = client.get(file["url"])
+    assert r.headers["content-type"] == g.MIME[".docx"]
+    assert Document(io.BytesIO(r.content)).paragraphs[2].text == "Madame, Monsieur,"
+
+
+def test_word_tool_is_offered_to_claude(client, upstream):
+    chat(client)
+    assert [t["name"] for t in upstream.last["tools"]] == ["create_pdf", "create_word", "create_excel"]
+    assert "create_word" in g.SYSTEM_PROMPT

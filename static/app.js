@@ -147,7 +147,7 @@
     a.href = f.url;
     a.download = f.name;
     const icon = document.createElement("span");
-    icon.className = "mf-icon"; icon.textContent = f.kind === "pdf" ? "PDF" : "XLSX";
+    icon.className = "mf-icon"; icon.textContent = ({ pdf: "PDF", docx: "DOCX", xlsx: "XLSX" })[f.kind] || "FICHIER";
     const info = document.createElement("span");
     info.className = "mf-info";
     const name = document.createElement("span");

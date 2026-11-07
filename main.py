@@ -56,7 +56,8 @@ PLACEHOLDER_KEYS = {"", "sk-ant-..."}
 
 # Nombre max d'allers-retours Claude ↔ outils dans une même réponse
 MAX_TOOL_ROUNDS = 6
-TOOL_STATUS = {"create_pdf": "Création du PDF…", "create_excel": "Création du fichier Excel…"}
+TOOL_STATUS = {"create_pdf": "Création du PDF…", "create_word": "Création du document Word…",
+               "create_excel": "Création du fichier Excel…"}
 
 STATIC_DIR = Path(__file__).parent / "static"
 
