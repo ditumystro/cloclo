@@ -235,7 +235,8 @@ def check_password(given: str | None) -> None:
 app.include_router(access.router)
 
 
-@app.get("/api/health")
+# HEAD aussi : les moniteurs comme UptimeRobot vérifient le site avec des requêtes HEAD
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health():
     return {"ok": True}
 

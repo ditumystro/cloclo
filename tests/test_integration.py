@@ -13,6 +13,11 @@ def test_health(client):
     assert client.get("/api/health").json() == {"ok": True}
 
 
+def test_health_answers_head_for_uptime_monitors(client):
+    """UptimeRobot utilise HEAD : un 404 le faisait afficher le site « Down »."""
+    assert client.head("/api/health").status_code == 200
+
+
 def test_config_without_password(client):
     assert client.get("/api/config").json() == {"password_required": False, "approval_required": False,
                                                  "modes": ["rapide", "standard", "approfondi"]}
