@@ -493,6 +493,23 @@
     } catch { /* hors ligne : on réessaiera au prochain chargement */ }
   }
 
+  // ------------------------------------------------ garder le serveur éveillé
+  // L'offre gratuite de Render endort l'app après 15 min sans requête : quelqu'un qui lit
+  // une longue réponse retrouverait ensuite 30 à 60 s d'attente. Tant que la page est
+  // visible, un petit signal toutes les 4 min garde le serveur éveillé ; au retour sur
+  // l'onglet, on le réveille tout de suite, avant même que la personne écrive.
+  const KEEP_AWAKE_MS = 4 * 60 * 1000;
+  let lastPing = Date.now();
+  function ping() {
+    lastPing = Date.now();
+    fetch("/api/health", { cache: "no-store" }).catch(() => {});
+  }
+  setInterval(() => { if (document.visibilityState === "visible") ping(); }, KEEP_AWAKE_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && Date.now() - lastPing > 60 * 1000) ping();
+  });
+  promptEl.addEventListener("focus", () => { if (Date.now() - lastPing > 60 * 1000) ping(); });
+
   adoptAccessLink().then(() => fetch("/api/config")).then((r) => r.json()).then((cfg) => {
     if (cfg.approval_required && !store.get("pc-access")) showAccess();
     else if (cfg.password_required && !store.get("pc-pwd")) showGate();
