@@ -89,6 +89,14 @@ pytest
 3. Renseigne `ANTHROPIC_API_KEY` et `APP_PASSWORD` quand Render les demande.
 4. Ton app est en ligne sur `https://cloclo-xxxx.onrender.com`.
 
+### Domaine personnalisé (Cloudflare)
+
+L'app est en ligne sur **https://cloclo-app.site** : domaine géré par Cloudflare, enregistrements
+`CNAME` (`@` et `www`) vers `cloclo.onrender.com` en mode **Proxied** (nuage orange), SSL **Full (strict)**.
+Le proxy cache les adresses de Render : utile quand un opérateur (Orange Cameroun) n'arrive pas à
+joindre `onrender.com`. Avec `PUBLIC_URL=https://cloclo-app.site`, l'adresse `cloclo.onrender.com`
+redirige vers le domaine (chemin et paramètres conservés, sauf `/api/health`).
+
 Le plan gratuit met le service en veille après un moment d'inactivité :
 la première requête après une pause peut prendre ~30 s.
 

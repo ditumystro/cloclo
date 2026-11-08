@@ -186,3 +186,42 @@ def test_chat_no_fallback_for_haiku(client, upstream):
     """Claude Haiku 5.5 n'a pas de repli côté serveur : ne pas l'envoyer."""
     chat(client, mode="rapide")
     assert "fallbacks" not in upstream.last
+
+
+# ------------------------------------------------------------ redirection vers le domaine
+@pytest.fixture
+def own_domain(monkeypatch):
+    monkeypatch.setattr(main.access, "PUBLIC_URL", "https://cloclo-app.site")
+
+
+def test_onrender_redirects_to_own_domain_keeping_path_and_query(client, own_domain):
+    r = client.get("/?acces=JETON123", headers={"host": "cloclo.onrender.com"}, follow_redirects=False)
+    assert r.status_code == 301
+    assert r.headers["location"] == "https://cloclo-app.site/?acces=JETON123"
+
+
+def test_redirect_keeps_method_for_api_posts(client, own_domain):
+    r = client.post("/api/chat", json={}, headers={"host": "cloclo.onrender.com"}, follow_redirects=False)
+    assert r.status_code == 308 and r.headers["location"] == "https://cloclo-app.site/api/chat"
+
+
+def test_health_is_not_redirected(client, own_domain):
+    """Render et UptimeRobot vérifient /api/health sur l'adresse onrender.com."""
+    r = client.get("/api/health", headers={"host": "cloclo.onrender.com"}, follow_redirects=False)
+    assert r.status_code == 200
+
+
+def test_own_domain_is_served_normally(client, own_domain):
+    assert client.get("/", headers={"host": "cloclo-app.site"}).status_code == 200
+
+
+def test_no_redirect_without_public_url(client, monkeypatch):
+    monkeypatch.setattr(main.access, "PUBLIC_URL", "")
+    r = client.get("/", headers={"host": "cloclo.onrender.com"}, follow_redirects=False)
+    assert r.status_code == 200
+
+
+def test_no_redirect_when_public_url_is_onrender(client, monkeypatch):
+    monkeypatch.setattr(main.access, "PUBLIC_URL", "https://cloclo.onrender.com")
+    r = client.get("/", headers={"host": "cloclo.onrender.com"}, follow_redirects=False)
+    assert r.status_code == 200

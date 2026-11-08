@@ -16,11 +16,12 @@ import secrets
 import time
 from collections import defaultdict, deque
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import Literal
 
 import anthropic
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
@@ -378,6 +379,21 @@ async def download(fid: str):
         raise HTTPException(404, "Ce fichier a expiré ou n’existe pas. Demande à Claude de le recréer.")
     path, name = found
     return FileResponse(path, filename=name, media_type=generators.MIME.get(Path(name).suffix, "application/octet-stream"))
+
+
+@app.middleware("http")
+async def redirect_to_own_domain(request: Request, call_next):
+    """cloclo.onrender.com -> ton domaine (PUBLIC_URL), en gardant le chemin et les paramètres :
+    les favoris et les liens d'accès déjà envoyés mènent au nouveau domaine. Certains
+    opérateurs (Orange Cameroun) n'arrivent pas à joindre les adresses onrender.com."""
+    host = (request.headers.get("host") or "").split(":")[0].lower()
+    target = access.PUBLIC_URL
+    if (target and host.endswith(".onrender.com") and request.url.path != "/api/health"
+            and urlsplit(target).hostname != host):
+        url = target + request.url.path + (f"?{request.url.query}" if request.url.query else "")
+        # 301 pour la navigation ; 308 garde la méthode (POST) et le contenu des requêtes
+        return RedirectResponse(url, status_code=301 if request.method in ("GET", "HEAD") else 308)
+    return await call_next(request)
 
 
 @app.middleware("http")
